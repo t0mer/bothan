@@ -41,10 +41,20 @@ type Endpoint struct {
 	Details           *EndpointDetails `json:"details"`
 }
 
+// Protocol is a supported TLS/SSL protocol version.
+type Protocol struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
+// Name of a protocol for display, e.g. "TLS 1.3".
+func (p Protocol) String() string { return p.Name + " " + p.Version }
+
 // EndpointDetails carries the deep assessment data. Only the fields Bothan uses
 // directly are typed; the full object is preserved in the scan's raw JSON.
 type EndpointDetails struct {
 	CertChains []CertChain `json:"certChains"`
+	Protocols  []Protocol  `json:"protocols"`
 
 	// Known vulnerability flags (see §9 vuln_detected).
 	VulnBeast       bool `json:"vulnBeast"`

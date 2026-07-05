@@ -2,8 +2,11 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/t0mer/bothan/internal/scanner"
 )
 
 // Scans holds the scan resource handlers (read-only detail views).
@@ -16,10 +19,39 @@ func NewScans(scans ScanReader) *Scans { return &Scans{scans: scans} }
 
 // Routes mounts the scan endpoints onto r.
 func (h *Scans) Routes(r chi.Router) {
+	r.Get("/compare", h.compare)
 	r.Route("/{id}", func(r chi.Router) {
 		r.Get("/", h.get)
 		r.Get("/raw", h.raw)
 	})
+}
+
+func (h *Scans) compare(w http.ResponseWriter, r *http.Request) {
+	fromID, err1 := strconv.ParseInt(r.URL.Query().Get("from"), 10, 64)
+	toID, err2 := strconv.ParseInt(r.URL.Query().Get("to"), 10, 64)
+	if err1 != nil || err2 != nil || fromID < 1 || toID < 1 {
+		WriteError(w, http.StatusBadRequest, "invalid", "from and to scan ids are required")
+		return
+	}
+
+	from, err := h.scans.Get(r.Context(), fromID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	to, err := h.scans.Get(r.Context(), toID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if from.HostID != to.HostID {
+		WriteError(w, http.StatusBadRequest, "invalid", "scans belong to different hosts")
+		return
+	}
+
+	fromRaw, _ := h.scans.GetRaw(r.Context(), fromID)
+	toRaw, _ := h.scans.GetRaw(r.Context(), toID)
+	WriteJSON(w, http.StatusOK, scanner.Compare(from, to, fromRaw, toRaw))
 }
 
 func (h *Scans) get(w http.ResponseWriter, r *http.Request) {
