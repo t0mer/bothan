@@ -39,18 +39,42 @@ type ScanReader interface {
 	LatestByHosts(ctx context.Context) (map[int64]model.HostScanSummary, error)
 }
 
+// HostScheduleLinker manages a host's schedule links.
+type HostScheduleLinker interface {
+	SetHostSchedules(ctx context.Context, hostID int64, scheduleIDs []int64) error
+	SchedulesForHost(ctx context.Context, hostID int64) ([]model.Schedule, error)
+}
+
 // Hosts holds the host resource handlers.
 type Hosts struct {
 	repo           HostRepo
 	defaultPublish func() bool
 	scanner        Scanner
 	scans          ScanReader
+	schedules      HostScheduleLinker
+	sched          SchedulerControl
 }
 
-// NewHosts builds the host handlers. defaultPublish supplies the current
-// default publish flag (read from settings) when a create request omits it.
-func NewHosts(repo HostRepo, defaultPublish func() bool, sc Scanner, scans ScanReader) *Hosts {
-	return &Hosts{repo: repo, defaultPublish: defaultPublish, scanner: sc, scans: scans}
+// HostsDeps are the collaborators the host handlers need.
+type HostsDeps struct {
+	Repo           HostRepo
+	DefaultPublish func() bool
+	Scanner        Scanner
+	Scans          ScanReader
+	Schedules      HostScheduleLinker
+	Scheduler      SchedulerControl
+}
+
+// NewHosts builds the host handlers.
+func NewHosts(d HostsDeps) *Hosts {
+	return &Hosts{
+		repo:           d.Repo,
+		defaultPublish: d.DefaultPublish,
+		scanner:        d.Scanner,
+		scans:          d.Scans,
+		schedules:      d.Schedules,
+		sched:          d.Scheduler,
+	}
 }
 
 // Routes mounts the host endpoints onto r.
@@ -65,7 +89,57 @@ func (h *Hosts) Routes(r chi.Router) {
 		r.Post("/disable", h.disable)
 		r.Post("/scan", h.scan)
 		r.Get("/scans", h.scanHistory)
+		r.Get("/schedules", h.getSchedules)
+		r.Put("/schedules", h.setSchedules)
 	})
+}
+
+func (h *Hosts) getSchedules(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	if _, err := h.repo.Get(r.Context(), id); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	scheds, err := h.schedules.SchedulesForHost(r.Context(), id)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "failed to load schedules")
+		return
+	}
+	WriteJSON(w, http.StatusOK, scheds)
+}
+
+type idListRequest struct {
+	IDs []int64 `json:"ids"`
+}
+
+func (h *Hosts) setSchedules(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	if _, err := h.repo.Get(r.Context(), id); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	var req idListRequest
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid", "malformed JSON body: "+err.Error())
+		return
+	}
+	if err := h.schedules.SetHostSchedules(r.Context(), id, req.IDs); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid", "failed to set schedules: "+err.Error())
+		return
+	}
+	if h.sched != nil {
+		_ = h.sched.Rebuild(r.Context())
+	}
+	scheds, _ := h.schedules.SchedulesForHost(r.Context(), id)
+	WriteJSON(w, http.StatusOK, scheds)
 }
 
 func (h *Hosts) scan(w http.ResponseWriter, r *http.Request) {
