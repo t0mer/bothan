@@ -174,6 +174,24 @@ func (r *ScanRepo) LatestReadyByHost(ctx context.Context, hostID int64) (*model.
 	return sc, nil
 }
 
+// PreviousReady returns the most recent ready scan for a host that precedes the
+// given scan id, or ErrNotFound if there is none (used for rule comparisons).
+func (r *ScanRepo) PreviousReady(ctx context.Context, hostID, beforeID int64) (*model.Scan, error) {
+	row := r.db.QueryRowContext(ctx,
+		`SELECT `+scanColumns+` FROM scans
+		 WHERE host_id = ? AND status = ? AND id < ?
+		 ORDER BY id DESC LIMIT 1`,
+		hostID, model.ScanStatusReady, beforeID)
+	sc, err := scanScan(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("previous ready scan for host %d: %w", hostID, err)
+	}
+	return sc, nil
+}
+
 // HasActive reports whether a host already has a pending or running scan.
 func (r *ScanRepo) HasActive(ctx context.Context, hostID int64) (bool, error) {
 	var n int
