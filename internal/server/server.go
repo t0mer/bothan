@@ -22,11 +22,12 @@ import (
 
 // Deps are the collaborators the HTTP server needs.
 type Deps struct {
-	Settings *settings.Service
-	Store    *store.Store
-	Metrics  *metrics.Metrics
-	Scanner  api.Scanner
-	Logger   *slog.Logger
+	Settings  *settings.Service
+	Store     *store.Store
+	Metrics   *metrics.Metrics
+	Scanner   api.Scanner
+	Scheduler api.SchedulerControl
+	Logger    *slog.Logger
 }
 
 // newSSLLabsFactory builds a client factory for the info/registration
@@ -64,14 +65,17 @@ func New(d Deps) (http.Handler, error) {
 	}
 
 	// API v1.
-	hosts := api.NewHosts(
-		d.Store.Hosts(),
-		func() bool { return d.Settings.Current().SSLLabs.DefaultPublish },
-		d.Scanner,
-		d.Store.Scans(),
-	)
+	hosts := api.NewHosts(api.HostsDeps{
+		Repo:           d.Store.Hosts(),
+		DefaultPublish: func() bool { return d.Settings.Current().SSLLabs.DefaultPublish },
+		Scanner:        d.Scanner,
+		Scans:          d.Store.Scans(),
+		Schedules:      d.Store.Schedules(),
+		Scheduler:      d.Scheduler,
+	})
 	settingsHandler := api.NewSettings(d.Settings)
 	scansHandler := api.NewScans(d.Store.Scans())
+	schedulesHandler := api.NewSchedules(d.Store.Schedules(), d.Scheduler)
 	ssllabsHandler := api.NewSSLLabs(d.Settings, newSSLLabsFactory(d.Settings.Bootstrap().SSLLabsBaseURL))
 	r.Route("/api/v1", func(v1 chi.Router) {
 		v1.NotFound(func(w http.ResponseWriter, _ *http.Request) {
@@ -83,6 +87,7 @@ func New(d Deps) (http.Handler, error) {
 		v1.Route("/hosts", hosts.Routes)
 		v1.Route("/settings", settingsHandler.Routes)
 		v1.Route("/scans", scansHandler.Routes)
+		v1.Route("/schedules", schedulesHandler.Routes)
 		v1.Route("/ssllabs", ssllabsHandler.Routes)
 	})
 

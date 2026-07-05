@@ -17,6 +17,7 @@ import (
 	"github.com/t0mer/bothan/internal/config"
 	"github.com/t0mer/bothan/internal/metrics"
 	"github.com/t0mer/bothan/internal/scanner"
+	"github.com/t0mer/bothan/internal/scheduler"
 	"github.com/t0mer/bothan/internal/server"
 	"github.com/t0mer/bothan/internal/settings"
 	"github.com/t0mer/bothan/internal/store"
@@ -83,12 +84,18 @@ func run(args []string) error {
 	})
 	recoverPendingScans(ctx, st, scanSvc, logger)
 
+	schedSvc := scheduler.New(st, scanSvc, logger)
+	if err := schedSvc.Rebuild(ctx); err != nil {
+		return fmt.Errorf("building schedule registry: %w", err)
+	}
+
 	handler, err := server.New(server.Deps{
-		Settings: settingsSvc,
-		Store:    st,
-		Metrics:  m,
-		Scanner:  scanSvc,
-		Logger:   logger,
+		Settings:  settingsSvc,
+		Store:     st,
+		Metrics:   m,
+		Scanner:   scanSvc,
+		Scheduler: schedSvc,
+		Logger:    logger,
 	})
 	if err != nil {
 		return fmt.Errorf("building server: %w", err)
@@ -130,6 +137,7 @@ func run(args []string) error {
 	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("graceful shutdown: %w", err)
 	}
+	schedSvc.Stop()
 	logger.Info("waiting for in-flight scans")
 	scanSvc.Wait()
 	logger.Info("bothan stopped")
