@@ -43,14 +43,23 @@ func (s *Service) Protect(unauthorized func(w http.ResponseWriter, r *http.Reque
 }
 
 // requiredScope maps a request to the scope it needs.
+//
+// Administration surfaces require admin: token management, config
+// export/import, and — crucially — settings *mutations* (a write-scoped token
+// must not be able to change security settings such as disabling auth, which
+// would be a privilege escalation). Reading settings needs only read since the
+// API never returns secrets.
 func requiredScope(r *http.Request) string {
-	if strings.Contains(r.URL.Path, "/config") || strings.Contains(r.URL.Path, "/tokens") {
+	path := r.URL.Path
+	if strings.Contains(path, "/config") || strings.Contains(path, "/tokens") {
 		return ScopeAdmin
 	}
-	switch r.Method {
-	case http.MethodGet, http.MethodHead:
-		return ScopeRead
-	default:
-		return ScopeWrite
+	isRead := r.Method == http.MethodGet || r.Method == http.MethodHead
+	if strings.Contains(path, "/settings") && !isRead {
+		return ScopeAdmin
 	}
+	if isRead {
+		return ScopeRead
+	}
+	return ScopeWrite
 }
