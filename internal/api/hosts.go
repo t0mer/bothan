@@ -27,12 +27,12 @@ type HostRepo interface {
 // Hosts holds the host resource handlers.
 type Hosts struct {
 	repo           HostRepo
-	defaultPublish bool
+	defaultPublish func() bool
 }
 
-// NewHosts builds the host handlers. defaultPublish seeds the publish flag when
-// a create request omits it.
-func NewHosts(repo HostRepo, defaultPublish bool) *Hosts {
+// NewHosts builds the host handlers. defaultPublish supplies the current
+// default publish flag (read from settings) when a create request omits it.
+func NewHosts(repo HostRepo, defaultPublish func() bool) *Hosts {
 	return &Hosts{repo: repo, defaultPublish: defaultPublish}
 }
 
@@ -78,7 +78,7 @@ func (h *Hosts) create(w http.ResponseWriter, r *http.Request) {
 	host := &model.Host{
 		Hostname:       req.Hostname,
 		Enabled:        boolOr(req.Enabled, true),
-		Publish:        boolOr(req.Publish, h.defaultPublish),
+		Publish:        boolOr(req.Publish, h.defaultPublish()),
 		IgnoreMismatch: boolOr(req.IgnoreMismatch, false),
 		FromCache:      boolOr(req.FromCache, false),
 		MaxAgeHours:    req.MaxAgeHours,

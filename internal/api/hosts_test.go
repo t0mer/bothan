@@ -79,7 +79,7 @@ func (f *fakeRepo) Delete(_ context.Context, id int64) error {
 
 func newRouter(repo HostRepo) http.Handler {
 	r := chi.NewRouter()
-	r.Route("/hosts", NewHosts(repo, false).Routes)
+	r.Route("/hosts", NewHosts(repo, func() bool { return false }).Routes)
 	return r
 }
 
