@@ -1,0 +1,43 @@
+# Bothan configuration example.
+#
+# Precedence: flags > environment > this file > built-in defaults.
+# Environment variables use the BOTHAN_ prefix with dots mapped to underscores,
+# e.g. server.port -> BOTHAN_SERVER_PORT, crypto.encryption_key ->
+# BOTHAN_CRYPTO_ENCRYPTION_KEY.
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  base_path: "/"          # for reverse-proxy sub-paths
+
+database:
+  path: "/data/bothan.db"
+
+ssllabs:
+  api_version: "v4"       # v4 | v3
+  email: ""               # required for v4
+  poll_interval: "10s"
+  max_workers: 5          # capped by SSL Labs /info capacity
+  scan_timeout: "20m"
+  default_publish: false
+
+crypto:
+  encryption_key: ""      # 32-byte key (base64/hex) for AES-256-GCM; REQUIRED
+                          # once any channel exists.
+                          # STRONGLY prefer env: BOTHAN_CRYPTO_ENCRYPTION_KEY
+                          # Keep it STABLE and backed up — reusing the same key on
+                          # another instance makes encrypted exports/backups portable.
+
+auth:
+  enabled: false
+  session_secret: ""
+  initial_admin_user: ""
+  initial_admin_password: ""
+  protect_metrics: false
+
+log:
+  level: "info"           # debug|info|warn|error
+  format: "json"          # json|text
+
+metrics:
+  enabled: true
