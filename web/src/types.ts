@@ -42,6 +42,26 @@ export interface DashboardSummary {
   }[];
 }
 
+export interface ImportReport {
+  hosts_created: number;
+  hosts_updated: number;
+  schedules_created: number;
+  schedules_updated: number;
+  channels_created: number;
+  channels_updated: number;
+  rules_created: number;
+  rules_updated: number;
+  removed: number;
+  links_created: number;
+  channels_needing_credentials: number;
+}
+
+export interface ImportResult {
+  dry_run: boolean;
+  mode: string;
+  report: ImportReport;
+}
+
 export interface Channel {
   id: number;
   name: string;

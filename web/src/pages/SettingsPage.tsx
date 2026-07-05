@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api";
+import BackupSection from "../components/BackupSection";
 import type { Settings, SettingsPatch } from "../types";
 
 export default function SettingsPage() {
@@ -58,6 +59,7 @@ export default function SettingsPage() {
       <MetricsSection settings={settings} onSave={save} saving={saving} />
       <ServerSection settings={settings} onSave={save} saving={saving} />
       <BootstrapSection settings={settings} />
+      <BackupSection />
     </div>
   );
 }

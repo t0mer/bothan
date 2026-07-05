@@ -3,6 +3,7 @@ import type {
   DashboardSummary,
   Host,
   HostInput,
+  ImportResult,
   Rule,
   Scan,
   ScanDiff,
@@ -79,6 +80,19 @@ export const api = {
   deleteRule: (id: number) => req<void>("DELETE", `/rules/${id}`),
 
   dashboard: () => req<DashboardSummary>("GET", "/dashboard/summary"),
+
+  exportConfig: (secret_encryption: string, passphrase?: string) =>
+    secret_encryption === "none"
+      ? req<unknown>("GET", "/config/export")
+      : req<unknown>("POST", "/config/export", { secret_encryption, passphrase }),
+  importConfig: (
+    bundleData: unknown,
+    opts: { mode: string; dry_run: boolean; passphrase?: string },
+  ) => {
+    const q = new URLSearchParams({ mode: opts.mode, dry_run: String(opts.dry_run) });
+    if (opts.passphrase) q.set("passphrase", opts.passphrase);
+    return req<ImportResult>("POST", `/config/import?${q.toString()}`, bundleData);
+  },
 
   getSettings: () => req<Settings>("GET", "/settings"),
   updateSettings: (patch: SettingsPatch) => req<Settings>("PUT", "/settings", patch),

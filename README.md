@@ -5,13 +5,13 @@ posture of your domains and websites using the [Qualys SSL Labs
 API](https://www.ssllabs.com/), tracks grade history, compares scans over time,
 and alerts you through multiple notification channels when something changes.
 
-> Status: early development. **Phases 1–7** are implemented — the single binary
+> Status: early development. **Phases 1–8** are implemented — the single binary
 > boots, shows a **dashboard**, manages monitored **hosts**, runs **SSL Labs
 > assessments**, **schedules** automatic scans via cron, sends **notifications**
 > (Shoutrrr, GreenAPI, WhatsApp) driven by a rules engine (credentials encrypted
-> at rest), and **compares** scans over time. It applies its database schema,
-> exposes Prometheus metrics, and embeds the React web UI. Export/import and auth
-> arrive in subsequent phases.
+> at rest), **compares** scans over time, and supports **config export/import**
+> for backup and migration. It applies its database schema, exposes Prometheus
+> metrics, and embeds the React web UI. Optional auth arrives next.
 
 ## What works today
 
@@ -149,6 +149,33 @@ Channel providers: `shoutrrr` (one URL covering Telegram/Slack/Discord/SMTP/…)
 `whatsapp_greenapi` (GreenAPI cloud), and `whatsapp_multidevice` (self-hosted
 go-whatsapp-web-multidevice). The encryption key is required once any channel
 exists — set `BOTHAN_CRYPTO_ENCRYPTION_KEY` and keep it stable.
+
+## Configuration export / import
+
+Back up your setup or migrate between instances via a versioned JSON bundle of
+hosts, schedules, channels, rules, and their links (referenced by natural key).
+**Scan history, the encryption key, session secret, users, and API tokens are
+never exported.**
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/config/export` | Export without secrets (`secret_encryption=none`). |
+| `POST` | `/api/v1/config/export` | Export with secrets: body `{ "secret_encryption": "instance_key"｜"passphrase", "passphrase?" }`. |
+| `POST` | `/api/v1/config/import` | Import a bundle. Query: `mode=merge｜replace`, `dry_run=true｜false`, `passphrase?`. |
+
+Secret modes:
+- **`none`** (default): channels import **disabled** and flagged `needs_credentials`.
+- **`instance_key`**: carries the AES ciphertext as-is plus a non-reversible key
+  fingerprint; import verifies the destination key matches before applying. Use
+  for backups and same-owner migrations with a shared, env-provisioned key.
+- **`passphrase`**: re-encrypts channel secrets under an argon2id-derived key;
+  import re-encrypts them with the destination instance key. Use when the two
+  instances run different keys.
+
+Import is transactional and all-or-nothing. `merge` upserts by natural key;
+`replace` wipes schedules, channels, and rules first (hosts are upserted so
+**scan history is preserved**). `dry_run=true` validates and reports what would
+change without applying. Manage all of this from **Settings → Backup / Migrate**.
 
 ## SSL Labs API
 
