@@ -5,14 +5,14 @@ posture of your domains and websites using the [Qualys SSL Labs
 API](https://www.ssllabs.com/), tracks grade history, compares scans over time,
 and alerts you through multiple notification channels when something changes.
 
-> Status: early development. **Phases 1–9** are implemented — the single binary
-> boots, shows a **dashboard**, manages monitored **hosts**, runs **SSL Labs
-> assessments**, **schedules** automatic scans via cron, sends **notifications**
-> (Shoutrrr, GreenAPI, WhatsApp) driven by a rules engine (credentials encrypted
-> at rest), **compares** scans over time, supports **config export/import**, and
-> offers **optional authentication** (login + scoped API tokens). It applies its
-> database schema, exposes Prometheus metrics, and embeds the React web UI.
-> Metrics polish and release packaging remain.
+Bothan runs as a **single static binary** (or a ~17 MB `scratch` Docker image):
+a **dashboard**, monitored **hosts**, **SSL Labs assessments**, cron
+**scheduling**, **notifications** (Shoutrrr, GreenAPI, WhatsApp) driven by a
+rules engine with credentials encrypted at rest, scan **comparison**, portable
+**config export/import**, **optional authentication** (login + scoped API
+tokens), a full **Prometheus** metric set with an example Grafana dashboard, and
+an embedded React web UI — all with no external dependencies beyond the SSL Labs
+API.
 
 ## What works today
 
@@ -36,19 +36,48 @@ and alerts you through multiple notification channels when something changes.
 
 ## Running
 
+### Docker (recommended)
+
 ```bash
-# build
+docker run -d --name bothan -p 8080:8080 \
+  -v bothan-data:/data \
+  -e BOTHAN_CRYPTO_ENCRYPTION_KEY="$(openssl rand -base64 32)" \
+  techblog/bothan:latest
+```
+
+Or with Compose (`docker-compose.yml` is included):
+
+```bash
+BOTHAN_CRYPTO_ENCRYPTION_KEY="$(openssl rand -base64 32)" docker compose up -d
+```
+
+The image is built `FROM scratch` and published multi-arch for
+`linux/amd64`, `linux/arm64`, and `linux/arm/v7`.
+
+### Binary
+
+Download a release archive for your OS/arch from the
+[releases page](https://github.com/t0mer/bothan/releases), or build it:
+
+```bash
+cd web && npm ci && npm run build && cd ..   # build the embedded UI
 go build -o bothan ./cmd/bothan
 
-# run against a local database; everything else is configured from the UI
-./bothan --db-path ./bothan.db
-
-# optionally pin the bind and provide the encryption key via the environment
-BOTHAN_CRYPTO_ENCRYPTION_KEY=... ./bothan --db-path ./bothan.db --port 8080
+./bothan --db-path ./bothan.db               # everything else is set in the UI
 ```
 
 Open the web UI at the bound address, then configure SSL Labs, logging, and the
 rest from the **Settings** page.
+
+### Bootstrap environment
+
+| Variable | Purpose |
+|---|---|
+| `BOTHAN_DATABASE_PATH` | SQLite path (default `/data/bothan.db`). |
+| `BOTHAN_CRYPTO_ENCRYPTION_KEY` | 32-byte AES key; **required once channels exist**. Keep it stable and backed up. |
+| `BOTHAN_SERVER_HOST` / `BOTHAN_SERVER_PORT` | Optional bind override. |
+| `BOTHAN_AUTH_INITIAL_ADMIN_USER` / `_PASSWORD` | Seed the first admin (used only on first boot). |
+| `BOTHAN_SSLLABS_BASE_URL` | Point at a self-hosted/mock SSL Labs endpoint. |
 
 ## Screenshots
 
@@ -269,6 +298,29 @@ npm install
 npm run dev      # hot-reload dev server, proxies /api to localhost:8080
 npm run build    # production build -> internal/web/dist (embedded on next go build)
 ```
+
+## Metrics & Grafana
+
+Prometheus metrics are exposed at `/metrics` under the `bothan_` namespace:
+`hosts_total`, `hosts_by_grade`, `host_grade`, `cert_expiry_days`, `scans_total`,
+`scan_duration_seconds`, `scan_queue_depth`, `ssllabs_requests_total`,
+`ssllabs_capacity`, and `notifications_total`, plus the standard Go/process
+collectors. An example dashboard is in
+[`docs/grafana/bothan-dashboard.json`](docs/grafana/bothan-dashboard.json).
+
+When auth is enabled, `/metrics` stays open unless **protect metrics** is also
+enabled.
+
+## Building & releasing
+
+- **CI** (`.github/workflows/ci.yml`) runs `go vet`, build, `go test -race`, and
+  a security suite (govulncheck, gosec, gitleaks, Trivy) on every push and PR.
+- **Release** (`.github/workflows/release.yml`) is a manual `workflow_dispatch`:
+  it resolves a date-based `YYYY.M.PATCH` version (or takes one as input), tags
+  it, and runs **GoReleaser** to build cross-platform archives and publish a
+  GitHub Release.
+- **Docker** (`.github/workflows/docker.yml`) builds and pushes the multi-arch
+  `techblog/bothan` image to Docker Hub.
 
 ## License
 
