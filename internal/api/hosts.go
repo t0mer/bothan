@@ -45,6 +45,17 @@ type HostScheduleLinker interface {
 	SchedulesForHost(ctx context.Context, hostID int64) ([]model.Schedule, error)
 }
 
+// HostChannelLinker manages a host's channel links.
+type HostChannelLinker interface {
+	SetHostChannels(ctx context.Context, hostID int64, channelIDs []int64) error
+	ChannelsForHost(ctx context.Context, hostID int64) ([]model.Channel, error)
+}
+
+// HostRuleReader lists the rules attached to a host.
+type HostRuleReader interface {
+	ListByHost(ctx context.Context, hostID int64) ([]model.Rule, error)
+}
+
 // Hosts holds the host resource handlers.
 type Hosts struct {
 	repo           HostRepo
@@ -52,6 +63,8 @@ type Hosts struct {
 	scanner        Scanner
 	scans          ScanReader
 	schedules      HostScheduleLinker
+	channels       HostChannelLinker
+	rules          HostRuleReader
 	sched          SchedulerControl
 }
 
@@ -62,6 +75,8 @@ type HostsDeps struct {
 	Scanner        Scanner
 	Scans          ScanReader
 	Schedules      HostScheduleLinker
+	Channels       HostChannelLinker
+	Rules          HostRuleReader
 	Scheduler      SchedulerControl
 }
 
@@ -73,6 +88,8 @@ func NewHosts(d HostsDeps) *Hosts {
 		scanner:        d.Scanner,
 		scans:          d.Scans,
 		schedules:      d.Schedules,
+		channels:       d.Channels,
+		rules:          d.Rules,
 		sched:          d.Scheduler,
 	}
 }
@@ -91,7 +108,68 @@ func (h *Hosts) Routes(r chi.Router) {
 		r.Get("/scans", h.scanHistory)
 		r.Get("/schedules", h.getSchedules)
 		r.Put("/schedules", h.setSchedules)
+		r.Get("/channels", h.getChannels)
+		r.Put("/channels", h.setChannels)
+		r.Get("/rules", h.getRules)
 	})
+}
+
+func (h *Hosts) getChannels(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	if _, err := h.repo.Get(r.Context(), id); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	chans, err := h.channels.ChannelsForHost(r.Context(), id)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "failed to load channels")
+		return
+	}
+	WriteJSON(w, http.StatusOK, chans)
+}
+
+func (h *Hosts) setChannels(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	if _, err := h.repo.Get(r.Context(), id); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	var req idListRequest
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid", "malformed JSON body: "+err.Error())
+		return
+	}
+	if err := h.channels.SetHostChannels(r.Context(), id, req.IDs); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid", "failed to set channels: "+err.Error())
+		return
+	}
+	chans, _ := h.channels.ChannelsForHost(r.Context(), id)
+	WriteJSON(w, http.StatusOK, chans)
+}
+
+func (h *Hosts) getRules(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	if _, err := h.repo.Get(r.Context(), id); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	rules, err := h.rules.ListByHost(r.Context(), id)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "failed to load rules")
+		return
+	}
+	WriteJSON(w, http.StatusOK, rules)
 }
 
 func (h *Hosts) getSchedules(w http.ResponseWriter, r *http.Request) {
