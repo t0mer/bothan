@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api";
 import { gradeClasses, gradeLabel } from "../lib/grade";
+import HostSchedulesDialog from "../components/HostSchedulesDialog";
 import type { Host } from "../types";
 
 export default function HostsPage() {
@@ -8,6 +9,7 @@ export default function HostsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState<Set<number>>(new Set());
+  const [linkHost, setLinkHost] = useState<Host | null>(null);
 
   async function refresh() {
     try {
@@ -72,10 +74,13 @@ export default function HostsPage() {
           hosts={hosts}
           scanning={scanning}
           onScan={scan}
+          onSchedules={setLinkHost}
           onChanged={refresh}
           onError={setError}
         />
       )}
+
+      {linkHost && <HostSchedulesDialog host={linkHost} onClose={() => setLinkHost(null)} />}
     </div>
   );
 }
@@ -151,12 +156,14 @@ function HostsTable({
   hosts,
   scanning,
   onScan,
+  onSchedules,
   onChanged,
   onError,
 }: {
   hosts: Host[];
   scanning: Set<number>;
   onScan: (id: number) => void;
+  onSchedules: (h: Host) => void;
   onChanged: () => void;
   onError: (msg: string) => void;
 }) {
@@ -219,6 +226,13 @@ function HostsTable({
                       className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
                     >
                       {isScanning ? "Scanning…" : "Scan now"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onSchedules(h)}
+                      className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                    >
+                      Schedules
                     </button>
                     <button
                       type="button"

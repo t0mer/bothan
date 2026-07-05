@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { currentTheme, toggleTheme, type Theme } from "./lib/theme";
 import HostsPage from "./pages/HostsPage";
+import SchedulesPage from "./pages/SchedulesPage";
 import SettingsPage from "./pages/SettingsPage";
 
-type Page = "hosts" | "settings";
+type Page = "hosts" | "schedules" | "settings";
 
 export default function App() {
   const [theme, setThemeState] = useState<Theme>(currentTheme());
@@ -41,6 +42,7 @@ export default function App() {
             </div>
             <nav className="flex items-center gap-1">
               {navItem("hosts", "Hosts")}
+              {navItem("schedules", "Schedules")}
               {navItem("settings", "Settings")}
             </nav>
           </div>
@@ -56,7 +58,9 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-6">
-        {page === "hosts" ? <HostsPage /> : <SettingsPage />}
+        {page === "hosts" && <HostsPage />}
+        {page === "schedules" && <SchedulesPage />}
+        {page === "settings" && <SettingsPage />}
       </main>
     </div>
   );

@@ -1,4 +1,4 @@
-import type { Host, HostInput, Scan, Settings, SettingsPatch } from "../types";
+import type { Host, HostInput, Scan, Schedule, Settings, SettingsPatch } from "../types";
 
 const BASE = "/api/v1";
 
@@ -40,6 +40,16 @@ export const api = {
   scanHost: (id: number) => req<Scan>("POST", `/hosts/${id}/scan`),
   hostScans: (id: number) => req<Scan[]>("GET", `/hosts/${id}/scans`),
   getScan: (id: number) => req<Scan>("GET", `/scans/${id}`),
+
+  listSchedules: () => req<Schedule[]>("GET", "/schedules"),
+  createSchedule: (s: { name: string; spec: string; enabled?: boolean }) =>
+    req<Schedule>("POST", "/schedules", s),
+  updateSchedule: (id: number, s: { name: string; spec: string; enabled?: boolean }) =>
+    req<Schedule>("PUT", `/schedules/${id}`, s),
+  deleteSchedule: (id: number) => req<void>("DELETE", `/schedules/${id}`),
+  hostSchedules: (id: number) => req<Schedule[]>("GET", `/hosts/${id}/schedules`),
+  setHostSchedules: (id: number, ids: number[]) =>
+    req<Schedule[]>("PUT", `/hosts/${id}/schedules`, { ids }),
 
   getSettings: () => req<Settings>("GET", "/settings"),
   updateSettings: (patch: SettingsPatch) => req<Settings>("PUT", "/settings", patch),

@@ -14,6 +14,15 @@ export interface Host {
   last_scan_at?: string;
 }
 
+export interface Schedule {
+  id: number;
+  name: string;
+  spec: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Scan {
   id: number;
   host_id: number;

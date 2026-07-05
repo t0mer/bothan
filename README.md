@@ -5,12 +5,12 @@ posture of your domains and websites using the [Qualys SSL Labs
 API](https://www.ssllabs.com/), tracks grade history, compares scans over time,
 and alerts you through multiple notification channels when something changes.
 
-> Status: early development. **Phases 1–3** are implemented — the single binary
+> Status: early development. **Phases 1–4** are implemented — the single binary
 > boots, manages monitored **hosts** (CRUD via API and UI), runs **SSL Labs
 > assessments** (manual "scan now", grade history, per-endpoint results),
-> applies its database schema, exposes Prometheus metrics, and embeds the React
-> web UI. Scheduling, notifications, comparison, dashboard, export/import, and
-> auth arrive in subsequent phases.
+>**schedules** automatic scans via cron, applies its database schema, exposes
+> Prometheus metrics, and embeds the React web UI. Notifications, comparison,
+> dashboard, export/import, and auth arrive in subsequent phases.
 
 ## What works today
 
@@ -55,6 +55,9 @@ rest from the **Settings** page.
 ### Hosts (dark)
 ![Hosts — dark](assets/screenshots/hosts-dark.png)
 
+### Schedules
+![Schedules](assets/screenshots/schedules-light.png)
+
 ## Host API
 
 | Method | Path | Description |
@@ -68,6 +71,24 @@ rest from the **Settings** page.
 | `POST` | `/api/v1/hosts/{id}/disable` | Disable scanning without deleting. |
 | `POST` | `/api/v1/hosts/{id}/scan` | Trigger a manual SSL Labs scan (202 Accepted). |
 | `GET` | `/api/v1/hosts/{id}/scans` | Scan history for a host. |
+| `GET` | `/api/v1/hosts/{id}/schedules` | Schedules linked to a host. |
+| `PUT` | `/api/v1/hosts/{id}/schedules` | Set linked schedule ids (`{ "ids": [...] }`). |
+
+## Schedule API
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/schedules` | List schedules. |
+| `POST` | `/api/v1/schedules` | Create a schedule (`{ "name", "spec", "enabled?" }`). |
+| `GET` | `/api/v1/schedules/{id}` | Get a schedule. |
+| `PUT` | `/api/v1/schedules/{id}` | Update a schedule. |
+| `DELETE` | `/api/v1/schedules/{id}` | Delete a schedule. |
+
+Schedule `spec` accepts standard 5-field cron (`0 3 * * *`), cron descriptors
+(`@hourly`, `@daily`, `@weekly`, `@monthly`), or friendly text (`Everyday`,
+`Hourly`, `Weekly`, `Monthly`), normalized on save. A schedule firing enqueues a
+scan for every **enabled** host linked to it; disabled hosts and disabled
+schedules never enqueue, and a host with a scan already in progress is skipped.
 
 ## Scan API
 
