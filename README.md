@@ -5,10 +5,11 @@ posture of your domains and websites using the [Qualys SSL Labs
 API](https://www.ssllabs.com/), tracks grade history, compares scans over time,
 and alerts you through multiple notification channels when something changes.
 
-> Status: early development. **Phase 1 (skeleton)** is implemented — the single
-> binary boots, serves its HTTP surface, applies its database schema, exposes
-> Prometheus metrics, and embeds the (placeholder) web UI. Hosts, scanning,
-> scheduling, notifications, and the full UI arrive in subsequent phases.
+> Status: early development. **Phases 1–2** are implemented — the single binary
+> boots, serves its HTTP surface, manages monitored **hosts** (CRUD via API and
+> a web UI), applies its database schema, exposes Prometheus metrics, and embeds
+> the React web UI. Scanning, scheduling, notifications, comparison, dashboard,
+> export/import, and auth arrive in subsequent phases.
 
 ## What works today
 
@@ -16,15 +17,51 @@ and alerts you through multiple notification channels when something changes.
 - Configuration via flags, environment, or YAML (precedence: flags > env > YAML).
 - SQLite database (pure-Go `modernc.org/sqlite`) with embedded, versioned
   migrations applied at startup.
+- **Host management** — add, list, edit, enable/disable, and delete monitored
+  hostnames (with per-host public/private, cache, and mismatch options),
+  through both the REST API and the web UI.
 - HTTP server (chi) with:
   - `GET /healthz` — liveness.
   - `GET /readyz` — readiness (checks the database).
   - `GET /metrics` — Prometheus metrics.
-  - `/api/v1/*` — versioned API surface (JSON error envelope; resources land in
-    later phases).
-  - Embedded single-page app served at `/` with client-side-route fallback.
+  - `/api/v1/hosts` — host CRUD (JSON error envelope).
+  - Embedded React single-page app served at `/` with client-side-route
+    fallback and light/dark themes.
 - Structured logging via `log/slog` (JSON or text, configurable level).
 - Graceful shutdown on `SIGINT` / `SIGTERM`.
+
+## Screenshots
+
+### Hosts (light)
+![Hosts — light](assets/screenshots/hosts-light.png)
+
+### Hosts (dark)
+![Hosts — dark](assets/screenshots/hosts-dark.png)
+
+## Host API
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/hosts` | List hosts (ordered by hostname). |
+| `POST` | `/api/v1/hosts` | Create a host. Body: `{ "hostname", "publish?", "ignore_mismatch?", "from_cache?", "max_age_hours?", "notes?" }`. Defaults: `enabled=true`, `publish=false` (private). |
+| `GET` | `/api/v1/hosts/{id}` | Get a host. |
+| `PUT` | `/api/v1/hosts/{id}` | Update a host. |
+| `DELETE` | `/api/v1/hosts/{id}` | Delete a host (cascades to its scans). |
+| `POST` | `/api/v1/hosts/{id}/enable` | Enable scanning for a host. |
+| `POST` | `/api/v1/hosts/{id}/disable` | Disable scanning without deleting. |
+
+## Frontend development
+
+The web UI lives in `web/` (React + Vite + TypeScript + Tailwind). The build
+output is written to `internal/web/dist` and embedded into the binary via
+`go:embed`.
+
+```bash
+cd web
+npm install
+npm run dev      # hot-reload dev server, proxies /api to localhost:8080
+npm run build    # production build -> internal/web/dist (embedded on next go build)
+```
 
 ## Running
 
