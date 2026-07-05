@@ -7,6 +7,7 @@ import type {
   HostInput,
   ImportResult,
   Rule,
+  RawHost,
   Scan,
   ScanDiff,
   Schedule,
@@ -55,6 +56,7 @@ export const api = {
   hostScans: (id: number) => req<Scan[]>("GET", `/hosts/${id}/scans`),
   getScan: (id: number) => req<Scan>("GET", `/scans/${id}`),
   compareScans: (from: number, to: number) => req<ScanDiff>("GET", `/scans/compare?from=${from}&to=${to}`),
+  getScanRaw: (id: number) => req<RawHost>("GET", `/scans/${id}/raw`),
 
   listSchedules: () => req<Schedule[]>("GET", "/schedules"),
   createSchedule: (s: { name: string; spec: string; enabled?: boolean }) =>

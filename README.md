@@ -146,10 +146,21 @@ schedules never enqueue, and a host with a scan already in progress is skipped.
 | `GET` | `/api/v1/scans/{id}/raw` | Full raw SSL Labs Host JSON for the scan. |
 | `GET` | `/api/v1/scans/compare?from=&to=` | Structured diff of two scans of the same host. |
 
+Every scan stores the **complete** raw SSL Labs Host object (`all=done`), so the
+full report is always available — not just the grade. In the UI, click a
+hostname to open its scan history; each scan has a **Report** button that opens
+the full report (per-endpoint grades, warnings, certificate subject/issuer/
+expiry, supported protocols, and detected vulnerabilities) with a **Download raw
+JSON** action. `GET /scans/{id}` returns the structured detail and
+`GET /scans/{id}/raw` the complete raw payload.
+
 Comparison matches endpoints by IP and reports overall/per-endpoint grade
 changes, certificate changes (subject/issuer/expiry), and added/removed
-protocols and vulnerability flags. In the UI, click a hostname to open its scan
-history and pick two scans to compare.
+protocols and vulnerability flags — pick two scans in the history dialog to
+compare.
+
+### Full scan report
+![Full scan report](assets/screenshots/scan-report-light.png)
 
 ### Scan history
 ![Scan history and compare](assets/screenshots/compare-light.png)
