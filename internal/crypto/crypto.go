@@ -34,6 +34,14 @@ func New(key string) (*Cipher, error) {
 	if err != nil {
 		return nil, err
 	}
+	return newFromRawKey(raw)
+}
+
+// newFromRawKey builds a Cipher from an exactly-32-byte key.
+func newFromRawKey(raw []byte) (*Cipher, error) {
+	if len(raw) != 32 {
+		return nil, fmt.Errorf("key must be 32 bytes, got %d", len(raw))
+	}
 	block, err := aes.NewCipher(raw)
 	if err != nil {
 		return nil, fmt.Errorf("creating AES cipher: %w", err)
