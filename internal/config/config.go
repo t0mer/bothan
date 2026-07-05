@@ -35,6 +35,11 @@ type Bootstrap struct {
 	ServerHostSet bool
 	ServerPort    int
 	ServerPortSet bool
+
+	// InitialAdmin* seed the first admin user on first boot (env only; the
+	// password is never persisted as a setting).
+	InitialAdminUser     string
+	InitialAdminPassword string
 }
 
 // RegisterFlags registers the bootstrap CLI flags. main() and tests share this.
@@ -55,6 +60,8 @@ func Load(fs *pflag.FlagSet) (*Bootstrap, error) {
 	if v, ok := resolveOptionalString(fs, "", "BOTHAN_SSLLABS_BASE_URL"); ok {
 		b.SSLLabsBaseURL = v
 	}
+	b.InitialAdminUser = os.Getenv("BOTHAN_AUTH_INITIAL_ADMIN_USER")
+	b.InitialAdminPassword = os.Getenv("BOTHAN_AUTH_INITIAL_ADMIN_PASSWORD")
 
 	if host, ok := resolveOptionalString(fs, "host", "BOTHAN_SERVER_HOST"); ok {
 		b.ServerHost, b.ServerHostSet = host, true

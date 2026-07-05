@@ -2,13 +2,24 @@ package settings
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"maps"
 	"sync"
 	"sync/atomic"
 
 	"github.com/t0mer/bothan/internal/config"
 )
+
+func randomHex(n int) (string, error) {
+	b := make([]byte, n)
+	if _, err := io.ReadFull(rand.Reader, b); err != nil {
+		return "", fmt.Errorf("generating random bytes: %w", err)
+	}
+	return hex.EncodeToString(b), nil
+}
 
 // Repo is the persistence contract the service needs.
 type Repo interface {
@@ -40,6 +51,20 @@ func New(ctx context.Context, repo Repo, bootstrap config.Bootstrap) (*Service, 
 	if err != nil {
 		return nil, fmt.Errorf("loading settings: %w", err)
 	}
+
+	// Generate a persistent session-signing secret on first boot so sessions
+	// survive restarts. It is never returned by the API.
+	if raw[KeyAuthSessionSecret] == "" {
+		secret, err := randomHex(32)
+		if err != nil {
+			return nil, err
+		}
+		if err := repo.SetMany(ctx, map[string]string{KeyAuthSessionSecret: secret}); err != nil {
+			return nil, fmt.Errorf("persisting session secret: %w", err)
+		}
+		raw[KeyAuthSessionSecret] = secret
+	}
+
 	snap, err := build(raw)
 	if err != nil {
 		return nil, fmt.Errorf("building settings snapshot: %w", err)

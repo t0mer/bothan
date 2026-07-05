@@ -42,7 +42,14 @@ type settingsResponse struct {
 	Log       logDTO       `json:"log"`
 	SSLLabs   ssllabsDTO   `json:"ssllabs"`
 	Metrics   metricsDTO   `json:"metrics"`
+	Auth      authDTO      `json:"auth"`
 	Bootstrap bootstrapDTO `json:"bootstrap"`
+}
+
+type authDTO struct {
+	Enabled         bool `json:"enabled"`
+	ProtectMetrics  bool `json:"protect_metrics"`
+	RestartRequired bool `json:"restart_required"`
 }
 
 type serverDTO struct {
@@ -98,6 +105,7 @@ func (h *Settings) get(w http.ResponseWriter, _ *http.Request) {
 			DefaultPublish: cur.SSLLabs.DefaultPublish,
 		},
 		Metrics:   metricsDTO{Enabled: cur.Metrics.Enabled, RestartRequired: true},
+		Auth:      authDTO{Enabled: cur.Auth.Enabled, ProtectMetrics: cur.Auth.ProtectMetrics, RestartRequired: true},
 		Bootstrap: bootstrapDTO{DatabasePath: bs.DatabasePath, EncryptionKeySet: bs.EncryptionKey != ""},
 	}
 	WriteJSON(w, http.StatusOK, resp)
@@ -125,6 +133,10 @@ type settingsPatch struct {
 	Metrics *struct {
 		Enabled *bool `json:"enabled"`
 	} `json:"metrics"`
+	Auth *struct {
+		Enabled        *bool `json:"enabled"`
+		ProtectMetrics *bool `json:"protect_metrics"`
+	} `json:"auth"`
 }
 
 func (h *Settings) update(w http.ResponseWriter, r *http.Request) {
@@ -156,6 +168,10 @@ func (h *Settings) update(w http.ResponseWriter, r *http.Request) {
 	}
 	if p.Metrics != nil {
 		putBool(patch, settings.KeyMetricsEnabled, p.Metrics.Enabled)
+	}
+	if p.Auth != nil {
+		putBool(patch, settings.KeyAuthEnabled, p.Auth.Enabled)
+		putBool(patch, settings.KeyAuthProtectMetrics, p.Auth.ProtectMetrics)
 	}
 
 	if len(patch) == 0 {

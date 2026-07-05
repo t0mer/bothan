@@ -29,6 +29,10 @@ const (
 	KeySSLLabsDefaultPublish = "ssllabs.default_publish"
 
 	KeyMetricsEnabled = "metrics.enabled"
+
+	KeyAuthEnabled        = "auth.enabled"
+	KeyAuthProtectMetrics = "auth.protect_metrics"
+	KeyAuthSessionSecret  = "auth.session_secret"
 )
 
 // Settings is the typed, validated snapshot of all editable configuration.
@@ -37,6 +41,14 @@ type Settings struct {
 	Log     LogSettings     `json:"log"`
 	SSLLabs SSLLabsSettings `json:"ssllabs"`
 	Metrics MetricsSettings `json:"metrics"`
+	Auth    AuthSettings    `json:"auth"`
+}
+
+// AuthSettings holds optional authentication settings.
+type AuthSettings struct {
+	Enabled        bool   `json:"enabled"`
+	ProtectMetrics bool   `json:"protect_metrics"`
+	SessionSecret  string `json:"-"` // never serialized
 }
 
 // ServerSettings holds HTTP bind and routing settings.
@@ -85,6 +97,10 @@ func Defaults() map[string]string {
 		KeySSLLabsDefaultPublish: "false",
 
 		KeyMetricsEnabled: "true",
+
+		KeyAuthEnabled:        "false",
+		KeyAuthProtectMetrics: "false",
+		KeyAuthSessionSecret:  "",
 	}
 }
 
@@ -136,6 +152,11 @@ func build(raw map[string]string) (*Settings, error) {
 		},
 		Metrics: MetricsSettings{
 			Enabled: parseBool(get(KeyMetricsEnabled)),
+		},
+		Auth: AuthSettings{
+			Enabled:        parseBool(get(KeyAuthEnabled)),
+			ProtectMetrics: parseBool(get(KeyAuthProtectMetrics)),
+			SessionSecret:  get(KeyAuthSessionSecret),
 		},
 	}
 	if err := validate(s); err != nil {
