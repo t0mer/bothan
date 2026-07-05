@@ -1,0 +1,21 @@
+services:
+  bothan:
+    image: techblog/bothan:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      # Named volume: inherits the image's /data ownership and holds the SQLite
+      # database. Persist it across upgrades.
+      - bothan-data:/data
+    environment:
+      # REQUIRED once you add notification channels. Keep it stable and backed
+      # up — it makes encrypted exports/backups portable. Generate a 32-byte key,
+      # e.g.: openssl rand -base64 32
+      BOTHAN_CRYPTO_ENCRYPTION_KEY: "${BOTHAN_CRYPTO_ENCRYPTION_KEY:-}"
+      # Optional: seed the first admin user before enabling auth in Settings.
+      # BOTHAN_AUTH_INITIAL_ADMIN_USER: admin
+      # BOTHAN_AUTH_INITIAL_ADMIN_PASSWORD: change-me
+    restart: unless-stopped
+
+volumes:
+  bothan-data:
