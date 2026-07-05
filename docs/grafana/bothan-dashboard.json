@@ -1,0 +1,125 @@
+{
+  "title": "Bothan — SSL/TLS Posture",
+  "uid": "bothan-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "tags": ["bothan", "ssl", "tls"],
+  "time": { "from": "now-24h", "to": "now" },
+  "refresh": "1m",
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {}
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Total hosts",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "sum(bothan_hosts_total)", "refId": "A" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Enabled hosts",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "sum(bothan_hosts_total{enabled=\"true\"})", "refId": "A" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Scan queue depth",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "bothan_scan_queue_depth", "refId": "A" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "SSL Labs capacity (current / max)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "bothan_ssllabs_capacity{kind=\"current\"}", "legendFormat": "current", "refId": "A" },
+        { "expr": "bothan_ssllabs_capacity{kind=\"max\"}", "legendFormat": "max", "refId": "B" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Hosts by grade",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "options": { "orientation": "horizontal", "displayMode": "gradient" },
+      "targets": [
+        { "expr": "bothan_hosts_by_grade", "legendFormat": "{{grade}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Certificate expiry (days)",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "sort(bothan_cert_expiry_days)", "format": "table", "instant": true, "refId": "A" }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Scans by result (rate)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "sum by (status) (rate(bothan_scans_total[5m]))", "legendFormat": "{{status}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Scan duration (p50 / p95)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum(rate(bothan_scan_duration_seconds_bucket[10m])) by (le))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum(rate(bothan_scan_duration_seconds_bucket[10m])) by (le))", "legendFormat": "p95", "refId": "B" }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "SSL Labs requests by status code (rate)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "sum by (status_code) (rate(bothan_ssllabs_requests_total[5m]))", "legendFormat": "{{status_code}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Notifications by result (rate)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "sum by (channel_type, result) (rate(bothan_notifications_total[5m]))", "legendFormat": "{{channel_type}} {{result}}", "refId": "A" }
+      ]
+    }
+  ]
+}

@@ -5,8 +5,9 @@ CLAUDE.md
 .aider*
 
 # Design / implementation / planning docs — local only
-/docs/
-docs/*
+# (ignore everything under docs/ except the shipped Grafana example dashboard)
+/docs/*
+!/docs/grafana/
 *.design.md
 *.implementation.md
 
