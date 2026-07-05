@@ -84,6 +84,7 @@ func New(d Deps) (http.Handler, error) {
 	schedulesHandler := api.NewSchedules(d.Store.Schedules(), d.Scheduler)
 	channelsHandler := api.NewChannels(d.Store.Channels(), d.Cipher, dispatcher)
 	rulesHandler := api.NewRules(d.Store.Rules())
+	dashboardHandler := api.NewDashboard(d.Store.Dashboard())
 	ssllabsHandler := api.NewSSLLabs(d.Settings, newSSLLabsFactory(d.Settings.Bootstrap().SSLLabsBaseURL))
 	r.Route("/api/v1", func(v1 chi.Router) {
 		v1.NotFound(func(w http.ResponseWriter, _ *http.Request) {
@@ -98,6 +99,7 @@ func New(d Deps) (http.Handler, error) {
 		v1.Route("/schedules", schedulesHandler.Routes)
 		v1.Route("/channels", channelsHandler.Routes)
 		v1.Route("/rules", rulesHandler.Routes)
+		v1.Route("/dashboard", dashboardHandler.Routes)
 		v1.Route("/ssllabs", ssllabsHandler.Routes)
 	})
 
