@@ -1,0 +1,66 @@
+version: 2
+project_name: bothan
+
+before:
+  hooks:
+    - go mod tidy
+    - sh -c "cd web && npm ci && npm run build"
+
+builds:
+  - id: bothan
+    main: ./cmd/bothan
+    binary: bothan
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/t0mer/bothan/internal/version.Version={{ .Version }}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+      - arm
+      - "386"
+    goarm:
+      - "6"
+      - "7"
+    ignore:
+      - goos: darwin
+        goarch: arm
+      - goos: darwin
+        goarch: "386"
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: "386"
+
+archives:
+  - id: bothan
+    ids:
+      - bothan
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  use: github
+  sort: asc
+
+release:
+  github:
+    owner: t0mer
+    name: bothan
+  draft: false
+  prerelease: auto
