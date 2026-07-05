@@ -36,7 +36,14 @@ func TestMigrate_Idempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first open: %v", err)
 	}
+	var first int
+	if err := s1.DB().QueryRow(`SELECT COUNT(1) FROM schema_migrations`).Scan(&first); err != nil {
+		t.Fatalf("counting migrations: %v", err)
+	}
 	s1.Close()
+	if first < 1 {
+		t.Fatalf("no migrations recorded on first open")
+	}
 
 	// Re-opening the same file re-runs migrate(); it must not fail or reapply.
 	s2, err := Open(path)
@@ -45,14 +52,12 @@ func TestMigrate_Idempotent(t *testing.T) {
 	}
 	defer s2.Close()
 
-	var applied int
-	if err := s2.DB().QueryRow(
-		`SELECT COUNT(1) FROM schema_migrations`,
-	).Scan(&applied); err != nil {
+	var second int
+	if err := s2.DB().QueryRow(`SELECT COUNT(1) FROM schema_migrations`).Scan(&second); err != nil {
 		t.Fatalf("counting migrations: %v", err)
 	}
-	if applied != 1 {
-		t.Errorf("schema_migrations rows = %d, want 1", applied)
+	if second != first {
+		t.Errorf("schema_migrations rows changed on re-open: %d -> %d", first, second)
 	}
 }
 

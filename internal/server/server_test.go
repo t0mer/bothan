@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/t0mer/bothan/internal/config"
 	"github.com/t0mer/bothan/internal/metrics"
+	"github.com/t0mer/bothan/internal/settings"
 	"github.com/t0mer/bothan/internal/store"
 )
 
@@ -23,15 +25,16 @@ func testHandler(t *testing.T) http.Handler {
 	}
 	t.Cleanup(func() { st.Close() })
 
-	cfg := &config.Config{}
-	cfg.Metrics.Enabled = true
-	cfg.Server.BasePath = "/"
+	svc, err := settings.New(context.Background(), st.Settings(), config.Bootstrap{})
+	if err != nil {
+		t.Fatalf("settings: %v", err)
+	}
 
 	h, err := New(Deps{
-		Config:  cfg,
-		Store:   st,
-		Metrics: metrics.New(),
-		Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Settings: svc,
+		Store:    st,
+		Metrics:  metrics.New(),
+		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	if err != nil {
 		t.Fatalf("server.New: %v", err)

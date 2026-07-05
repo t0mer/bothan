@@ -17,6 +17,7 @@ import (
 	"github.com/t0mer/bothan/internal/config"
 	"github.com/t0mer/bothan/internal/metrics"
 	"github.com/t0mer/bothan/internal/server"
+	"github.com/t0mer/bothan/internal/settings"
 	"github.com/t0mer/bothan/internal/store"
 	"github.com/t0mer/bothan/internal/version"
 )
@@ -43,40 +44,55 @@ func run(args []string) error {
 		return nil
 	}
 
-	cfg, err := config.Load(fs)
+	bootstrap, err := config.Load(fs)
 	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
+		return fmt.Errorf("loading bootstrap config: %w", err)
 	}
 
-	logger := newLogger(cfg.Log)
-	slog.SetDefault(logger)
+	// A live log level lets the Settings page change verbosity without a restart.
+	levelVar := new(slog.LevelVar)
+	levelVar.Set(slog.LevelInfo)
 
-	st, err := store.Open(cfg.Database.Path)
+	ctx := context.Background()
+
+	st, err := store.Open(bootstrap.DatabasePath)
 	if err != nil {
 		return fmt.Errorf("opening store: %w", err)
 	}
 	defer st.Close()
 
+	settingsSvc, err := settings.New(ctx, st.Settings(), *bootstrap)
+	if err != nil {
+		return fmt.Errorf("loading settings: %w", err)
+	}
+
+	logger := newLogger(settingsSvc.Current().Log, levelVar)
+	slog.SetDefault(logger)
+	settingsSvc.OnChange(func(s *settings.Settings) {
+		levelVar.Set(parseLevel(s.Log.Level))
+	})
+
 	m := metrics.New()
 
 	handler, err := server.New(server.Deps{
-		Config:  cfg,
-		Store:   st,
-		Metrics: m,
-		Logger:  logger,
+		Settings: settingsSvc,
+		Store:    st,
+		Metrics:  m,
+		Logger:   logger,
 	})
 	if err != nil {
 		return fmt.Errorf("building server: %w", err)
 	}
 
-	addr := server.Addr(cfg.Server.Host, cfg.Server.Port)
+	host, port := settingsSvc.EffectiveBind()
+	addr := server.Addr(host, port)
 	httpSrv := &http.Server{
 		Addr:              addr,
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	errCh := make(chan error, 1)
@@ -84,7 +100,8 @@ func run(args []string) error {
 		logger.Info("bothan starting",
 			slog.String("version", version.Version),
 			slog.String("addr", addr),
-			slog.String("api_version", cfg.SSLLabs.APIVersion),
+			slog.String("api_version", settingsSvc.Current().SSLLabs.APIVersion),
+			slog.Bool("encryption_key_set", bootstrap.EncryptionKey != ""),
 		)
 		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
@@ -94,7 +111,7 @@ func run(args []string) error {
 	select {
 	case err := <-errCh:
 		return fmt.Errorf("http server: %w", err)
-	case <-ctx.Done():
+	case <-sigCtx.Done():
 		logger.Info("shutdown signal received")
 	}
 
@@ -107,20 +124,10 @@ func run(args []string) error {
 	return nil
 }
 
-// newLogger builds a slog logger honoring the configured level and format.
-func newLogger(c config.Log) *slog.Logger {
-	var level slog.Level
-	switch c.Level {
-	case "debug":
-		level = slog.LevelDebug
-	case "warn":
-		level = slog.LevelWarn
-	case "error":
-		level = slog.LevelError
-	default:
-		level = slog.LevelInfo
-	}
-
+// newLogger builds a slog logger honoring the configured format, with the level
+// driven by a shared LevelVar so it can change at runtime.
+func newLogger(c settings.LogSettings, level *slog.LevelVar) *slog.Logger {
+	level.Set(parseLevel(c.Level))
 	opts := &slog.HandlerOptions{Level: level}
 	var handler slog.Handler
 	if c.Format == "text" {
@@ -129,4 +136,17 @@ func newLogger(c config.Log) *slog.Logger {
 		handler = slog.NewJSONHandler(os.Stdout, opts)
 	}
 	return slog.New(handler)
+}
+
+func parseLevel(s string) slog.Level {
+	switch s {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }

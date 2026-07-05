@@ -12,8 +12,8 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/t0mer/bothan/internal/api"
-	"github.com/t0mer/bothan/internal/config"
 	"github.com/t0mer/bothan/internal/metrics"
+	"github.com/t0mer/bothan/internal/settings"
 	"github.com/t0mer/bothan/internal/store"
 	"github.com/t0mer/bothan/internal/version"
 	"github.com/t0mer/bothan/internal/web"
@@ -21,15 +21,21 @@ import (
 
 // Deps are the collaborators the HTTP server needs.
 type Deps struct {
-	Config  *config.Config
-	Store   *store.Store
-	Metrics *metrics.Metrics
-	Logger  *slog.Logger
+	Settings *settings.Service
+	Store    *store.Store
+	Metrics  *metrics.Metrics
+	Logger   *slog.Logger
 }
 
 // New builds the HTTP handler tree. The returned handler already accounts for
 // server.base_path when serving behind a reverse-proxy sub-path.
+//
+// Bind (server.host/port), metrics enablement, and base_path are read once at
+// construction; changing them takes effect on restart. SSL Labs and logging
+// settings are read live where they are consumed.
 func New(d Deps) (http.Handler, error) {
+	cur := d.Settings.Current()
+
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -39,12 +45,15 @@ func New(d Deps) (http.Handler, error) {
 	// System endpoints (unversioned, always reachable).
 	r.Get("/healthz", healthHandler)
 	r.Get("/readyz", readyHandler(d.Store))
-	if d.Config.Metrics.Enabled {
+	if cur.Metrics.Enabled {
 		r.Handle("/metrics", d.Metrics.Handler())
 	}
 
 	// API v1.
-	hosts := api.NewHosts(d.Store.Hosts(), d.Config.SSLLabs.DefaultPublish)
+	hosts := api.NewHosts(d.Store.Hosts(), func() bool {
+		return d.Settings.Current().SSLLabs.DefaultPublish
+	})
+	settingsHandler := api.NewSettings(d.Settings)
 	r.Route("/api/v1", func(v1 chi.Router) {
 		v1.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 			api.WriteError(w, http.StatusNotFound, "not_found", "no such API endpoint")
@@ -53,6 +62,7 @@ func New(d Deps) (http.Handler, error) {
 			api.WriteError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 		})
 		v1.Route("/hosts", hosts.Routes)
+		v1.Route("/settings", settingsHandler.Routes)
 	})
 
 	// Embedded SPA as the catch-all (mounted last so API/system routes win).
@@ -63,7 +73,7 @@ func New(d Deps) (http.Handler, error) {
 	r.NotFound(spa.ServeHTTP)
 	r.MethodNotAllowed(spa.ServeHTTP)
 
-	return applyBasePath(r, d.Config.Server.BasePath), nil
+	return applyBasePath(r, cur.Server.BasePath), nil
 }
 
 // applyBasePath strips a reverse-proxy sub-path prefix when configured.
