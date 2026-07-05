@@ -9,6 +9,37 @@ export interface Host {
   notes: string;
   created_at: string;
   updated_at: string;
+  latest_grade?: string;
+  last_scan_status?: string;
+  last_scan_at?: string;
+}
+
+export interface Scan {
+  id: number;
+  host_id: number;
+  status: string;
+  trigger: string;
+  overall_grade: string;
+  engine_version: string;
+  criteria_version: string;
+  error_message?: string;
+  started_at?: string;
+  completed_at?: string;
+  created_at: string;
+  endpoints?: ScanEndpoint[];
+}
+
+export interface ScanEndpoint {
+  id: number;
+  ip_address: string;
+  server_name?: string;
+  grade: string;
+  grade_trust_ignored?: string;
+  has_warnings: boolean;
+  is_exceptional: boolean;
+  status_message?: string;
+  cert_not_after?: string;
+  progress: number;
 }
 
 export interface HostInput {

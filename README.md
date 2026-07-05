@@ -5,11 +5,12 @@ posture of your domains and websites using the [Qualys SSL Labs
 API](https://www.ssllabs.com/), tracks grade history, compares scans over time,
 and alerts you through multiple notification channels when something changes.
 
-> Status: early development. **Phases 1–2** are implemented — the single binary
-> boots, serves its HTTP surface, manages monitored **hosts** (CRUD via API and
-> a web UI), applies its database schema, exposes Prometheus metrics, and embeds
-> the React web UI. Scanning, scheduling, notifications, comparison, dashboard,
-> export/import, and auth arrive in subsequent phases.
+> Status: early development. **Phases 1–3** are implemented — the single binary
+> boots, manages monitored **hosts** (CRUD via API and UI), runs **SSL Labs
+> assessments** (manual "scan now", grade history, per-endpoint results),
+> applies its database schema, exposes Prometheus metrics, and embeds the React
+> web UI. Scheduling, notifications, comparison, dashboard, export/import, and
+> auth arrive in subsequent phases.
 
 ## What works today
 
@@ -65,6 +66,29 @@ rest from the **Settings** page.
 | `DELETE` | `/api/v1/hosts/{id}` | Delete a host (cascades to its scans). |
 | `POST` | `/api/v1/hosts/{id}/enable` | Enable scanning for a host. |
 | `POST` | `/api/v1/hosts/{id}/disable` | Disable scanning without deleting. |
+| `POST` | `/api/v1/hosts/{id}/scan` | Trigger a manual SSL Labs scan (202 Accepted). |
+| `GET` | `/api/v1/hosts/{id}/scans` | Scan history for a host. |
+
+## Scan API
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/scans/{id}` | Scan detail with per-endpoint grades and cert expiry. |
+| `GET` | `/api/v1/scans/{id}/raw` | Full raw SSL Labs Host JSON for the scan. |
+
+## SSL Labs API
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/ssllabs/info` | Engine/criteria version, capacity, and registration status. |
+| `POST` | `/api/v1/ssllabs/register` | One-time v4 email registration (`{name, email, organization}`); persists the email. |
+
+Bothan targets SSL Labs **API v4** by default (which requires a registered
+email; register from the API or Settings) and supports **v3** as a legacy
+fallback that needs no registration. The overall host grade is the lowest-ranked
+grade across its endpoints. Polling, rate-limit back-off (429/503/529/500),
+concurrency, and cool-off follow the SSL Labs guidelines. Set
+`BOTHAN_SSLLABS_BASE_URL` to point at a self-hosted or mock endpoint.
 
 ## Settings
 
