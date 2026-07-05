@@ -23,6 +23,25 @@ export interface Schedule {
   updated_at: string;
 }
 
+export interface DashboardSummary {
+  total_hosts: number;
+  enabled_hosts: number;
+  disabled_hosts: number;
+  never_scanned: number;
+  grade_counts: { grade: string; count: number }[];
+  cert_expiry_window_days: number;
+  certs_expiring_soon: { host_id: number; hostname: string; not_after: string; days: number }[];
+  recent_scans: {
+    scan_id: number;
+    host_id: number;
+    hostname: string;
+    grade: string;
+    status: string;
+    completed_at?: string;
+    created_at: string;
+  }[];
+}
+
 export interface Channel {
   id: number;
   name: string;

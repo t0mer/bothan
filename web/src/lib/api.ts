@@ -1,5 +1,6 @@
 import type {
   Channel,
+  DashboardSummary,
   Host,
   HostInput,
   Rule,
@@ -76,6 +77,8 @@ export const api = {
   createRule: (r: unknown) => req<Rule>("POST", "/rules", r),
   updateRule: (id: number, r: unknown) => req<Rule>("PUT", `/rules/${id}`, r),
   deleteRule: (id: number) => req<void>("DELETE", `/rules/${id}`),
+
+  dashboard: () => req<DashboardSummary>("GET", "/dashboard/summary"),
 
   getSettings: () => req<Settings>("GET", "/settings"),
   updateSettings: (patch: SettingsPatch) => req<Settings>("PUT", "/settings", patch),

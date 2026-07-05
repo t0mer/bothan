@@ -5,18 +5,19 @@ posture of your domains and websites using the [Qualys SSL Labs
 API](https://www.ssllabs.com/), tracks grade history, compares scans over time,
 and alerts you through multiple notification channels when something changes.
 
-> Status: early development. **Phases 1–6** are implemented — the single binary
-> boots, manages monitored **hosts**, runs **SSL Labs assessments**,
-> **schedules** automatic scans via cron, sends **notifications** (Shoutrrr,
-> GreenAPI, WhatsApp) driven by a rules engine (credentials encrypted at rest),
-> and **compares** scans over time. It applies its database schema, exposes
-> Prometheus metrics, and embeds the React web UI. Dashboard, export/import, and
-> auth arrive in subsequent phases.
+> Status: early development. **Phases 1–7** are implemented — the single binary
+> boots, shows a **dashboard**, manages monitored **hosts**, runs **SSL Labs
+> assessments**, **schedules** automatic scans via cron, sends **notifications**
+> (Shoutrrr, GreenAPI, WhatsApp) driven by a rules engine (credentials encrypted
+> at rest), and **compares** scans over time. It applies its database schema,
+> exposes Prometheus metrics, and embeds the React web UI. Export/import and auth
+> arrive in subsequent phases.
 
 ## What works today
 
 - Single static binary (`bothan`), CGO-free.
-- Configuration via flags, environment, or YAML (precedence: flags > env > YAML).
+- Runtime configuration in the database, edited from the Settings page (no YAML);
+  only the DB path and encryption key come from env/flags.
 - SQLite database (pure-Go `modernc.org/sqlite`) with embedded, versioned
   migrations applied at startup.
 - **Host management** — add, list, edit, enable/disable, and delete monitored
@@ -50,6 +51,9 @@ rest from the **Settings** page.
 
 ## Screenshots
 
+### Dashboard
+![Dashboard](assets/screenshots/dashboard-light.png)
+
 ### Hosts (light)
 ![Hosts — light](assets/screenshots/hosts-light.png)
 
@@ -64,6 +68,13 @@ rest from the **Settings** page.
 
 ### Rules
 ![Rules](assets/screenshots/rules-light.png)
+
+## Dashboard API
+
+`GET /api/v1/dashboard/summary` returns total/enabled/disabled host counts, the
+number never scanned, the grade distribution (hosts at each grade by latest
+ready scan), certificates expiring within a window (`cert_days`, default 30),
+and recent scans (`recent`, default 10).
 
 ## Host API
 

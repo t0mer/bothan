@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
 import { currentTheme, toggleTheme, type Theme } from "./lib/theme";
+import DashboardPage from "./pages/DashboardPage";
 import HostsPage from "./pages/HostsPage";
 import SchedulesPage from "./pages/SchedulesPage";
 import ChannelsPage from "./pages/ChannelsPage";
 import RulesPage from "./pages/RulesPage";
 import SettingsPage from "./pages/SettingsPage";
 
-type Page = "hosts" | "schedules" | "channels" | "rules" | "settings";
+type Page = "dashboard" | "hosts" | "schedules" | "channels" | "rules" | "settings";
 
 export default function App() {
   const [theme, setThemeState] = useState<Theme>(currentTheme());
-  const [page, setPage] = useState<Page>("hosts");
+  const [page, setPage] = useState<Page>("dashboard");
 
   useEffect(() => {
     document.title = "Bothan";
@@ -43,6 +44,7 @@ export default function App() {
               </span>
             </div>
             <nav className="flex items-center gap-1">
+              {navItem("dashboard", "Dashboard")}
               {navItem("hosts", "Hosts")}
               {navItem("schedules", "Schedules")}
               {navItem("channels", "Channels")}
@@ -62,6 +64,7 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-6">
+        {page === "dashboard" && <DashboardPage />}
         {page === "hosts" && <HostsPage />}
         {page === "schedules" && <SchedulesPage />}
         {page === "channels" && <ChannelsPage />}
