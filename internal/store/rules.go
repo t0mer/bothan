@@ -69,6 +69,32 @@ func (r *RuleRepo) ListByHost(ctx context.Context, hostID int64) ([]model.Rule, 
 	return r.query(ctx, `SELECT `+ruleColumns+` FROM rules WHERE host_id = ? ORDER BY name`, hostID)
 }
 
+// SetHostRules replaces all of a host's rules with the given set (host-scoped
+// notification conditions selected on the host form), transactionally. Global
+// rules (host_id NULL) are untouched.
+func (r *RuleRepo) SetHostRules(ctx context.Context, hostID int64, rules []model.Rule) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM rules WHERE host_id = ?`, hostID); err != nil {
+		return fmt.Errorf("clearing host %d rules: %w", hostID, err)
+	}
+	for i := range rules {
+		rule := &rules[i]
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO rules (host_id, name, condition_type, threshold_grade, expiry_days, enabled)
+			VALUES (?, ?, ?, ?, ?, ?)`,
+			hostID, rule.Name, rule.ConditionType, nullableStr(rule.ThresholdGrade),
+			nullableInt(rule.ExpiryDays), boolToInt(rule.Enabled)); err != nil {
+			return fmt.Errorf("inserting host %d rule: %w", hostID, err)
+		}
+	}
+	return tx.Commit()
+}
+
 // Update writes a rule's fields and refreshes updated_at.
 func (r *RuleRepo) Update(ctx context.Context, rule *model.Rule) error {
 	var updatedAt string

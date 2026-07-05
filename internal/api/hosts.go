@@ -51,9 +51,10 @@ type HostChannelLinker interface {
 	ChannelsForHost(ctx context.Context, hostID int64) ([]model.Channel, error)
 }
 
-// HostRuleReader lists the rules attached to a host.
-type HostRuleReader interface {
+// HostRuleManager reads and replaces the rules attached to a host.
+type HostRuleManager interface {
 	ListByHost(ctx context.Context, hostID int64) ([]model.Rule, error)
+	SetHostRules(ctx context.Context, hostID int64, rules []model.Rule) error
 }
 
 // Hosts holds the host resource handlers.
@@ -64,7 +65,7 @@ type Hosts struct {
 	scans          ScanReader
 	schedules      HostScheduleLinker
 	channels       HostChannelLinker
-	rules          HostRuleReader
+	rules          HostRuleManager
 	sched          SchedulerControl
 }
 
@@ -76,7 +77,7 @@ type HostsDeps struct {
 	Scans          ScanReader
 	Schedules      HostScheduleLinker
 	Channels       HostChannelLinker
-	Rules          HostRuleReader
+	Rules          HostRuleManager
 	Scheduler      SchedulerControl
 }
 
@@ -111,7 +112,67 @@ func (h *Hosts) Routes(r chi.Router) {
 		r.Get("/channels", h.getChannels)
 		r.Put("/channels", h.setChannels)
 		r.Get("/rules", h.getRules)
+		r.Put("/rules", h.setRules)
 	})
+}
+
+// hostRuleSpec is one selected notification condition for a host.
+type hostRuleSpec struct {
+	ConditionType  string `json:"condition_type"`
+	ThresholdGrade string `json:"threshold_grade"`
+	ExpiryDays     *int   `json:"expiry_days"`
+}
+
+// setRules replaces the host's notification conditions (the "notify me when"
+// selections on the host form).
+func (h *Hosts) setRules(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	host, err := h.repo.Get(r.Context(), id)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	var req struct {
+		Rules []hostRuleSpec `json:"rules"`
+	}
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid", "malformed JSON body: "+err.Error())
+		return
+	}
+
+	rules := make([]model.Rule, 0, len(req.Rules))
+	seen := map[string]bool{}
+	for _, spec := range req.Rules {
+		if seen[spec.ConditionType] {
+			continue // one rule per condition from the host form
+		}
+		seen[spec.ConditionType] = true
+		rule := model.Rule{
+			HostID:         &host.ID,
+			Name:           host.Hostname + ": " + spec.ConditionType,
+			ConditionType:  spec.ConditionType,
+			ThresholdGrade: spec.ThresholdGrade,
+			ExpiryDays:     spec.ExpiryDays,
+			Enabled:        true,
+		}
+		if msg := validateRule(&rule); msg != "" {
+			WriteError(w, http.StatusBadRequest, "invalid", msg)
+			return
+		}
+		rules = append(rules, rule)
+	}
+
+	if err := h.rules.SetHostRules(r.Context(), id, rules); err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "failed to set rules")
+		return
+	}
+	out, _ := h.rules.ListByHost(r.Context(), id)
+	WriteJSON(w, http.StatusOK, out)
 }
 
 func (h *Hosts) getChannels(w http.ResponseWriter, r *http.Request) {
