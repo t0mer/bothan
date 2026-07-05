@@ -30,6 +30,22 @@ and alerts you through multiple notification channels when something changes.
 - Structured logging via `log/slog` (JSON or text, configurable level).
 - Graceful shutdown on `SIGINT` / `SIGTERM`.
 
+## Running
+
+```bash
+# build
+go build -o bothan ./cmd/bothan
+
+# run against a local database; everything else is configured from the UI
+./bothan --db-path ./bothan.db
+
+# optionally pin the bind and provide the encryption key via the environment
+BOTHAN_CRYPTO_ENCRYPTION_KEY=... ./bothan --db-path ./bothan.db --port 8080
+```
+
+Open the web UI at the bound address, then configure SSL Labs, logging, and the
+rest from the **Settings** page.
+
 ## Screenshots
 
 ### Hosts (light)
@@ -50,6 +66,43 @@ and alerts you through multiple notification channels when something changes.
 | `POST` | `/api/v1/hosts/{id}/enable` | Enable scanning for a host. |
 | `POST` | `/api/v1/hosts/{id}/disable` | Disable scanning without deleting. |
 
+## Settings
+
+Bothan has **no YAML configuration file**. Almost all configuration — server
+bind, logging, SSL Labs (API version, registered email, poll interval, workers,
+scan timeout, default publish), and metrics — is stored in the database and
+edited at runtime from the **Settings** page (or the settings API). Changes to
+SSL Labs settings and the log level apply immediately; server bind, log format,
+and metrics enablement take effect on restart.
+
+### Settings page
+![Settings](assets/screenshots/settings-light.png)
+
+### Settings API
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/settings` | Current effective settings. The encryption key is reported only as `encryption_key_set` — never returned. |
+| `PUT` | `/api/v1/settings` | Update a partial set of settings (validated, all-or-nothing). |
+
+### Bootstrap (environment/flags only)
+
+Two things cannot live in the database and are provided at startup: the database
+path (needed to open the DB) and the encryption key (storing the master key
+inside the store it protects would defeat encryption-at-rest). An optional
+server-bind override lets a container pin its address regardless of the stored
+value.
+
+| Flag | Env | Description |
+|---|---|---|
+| `--db-path` | `BOTHAN_DATABASE_PATH` | SQLite database path (default `/data/bothan.db`). |
+| `--encryption-key` | `BOTHAN_CRYPTO_ENCRYPTION_KEY` | AES-256-GCM key. Prefer the env var; never stored in the DB. Keep it stable and backed up. |
+| `--host` | `BOTHAN_SERVER_HOST` | Optional bind host override (wins over the stored value). |
+| `--port` | `BOTHAN_SERVER_PORT` | Optional bind port override (wins over the stored value). |
+| `--version` | — | Print the version and exit. |
+
+Bootstrap precedence is **flags > environment > default**.
+
 ## Frontend development
 
 The web UI lives in `web/` (React + Vite + TypeScript + Tailwind). The build
@@ -62,48 +115,6 @@ npm install
 npm run dev      # hot-reload dev server, proxies /api to localhost:8080
 npm run build    # production build -> internal/web/dist (embedded on next go build)
 ```
-
-## Running
-
-```bash
-# build
-go build -o bothan ./cmd/bothan
-
-# run against a local database on port 8080
-./bothan --db-path ./bothan.db --port 8080 --log-format text
-```
-
-Copy `config.yaml.example` to `config.yaml` and pass `--config config.yaml` to
-use a file instead of flags/env.
-
-## CLI flags
-
-| Flag | Config key | Description |
-|---|---|---|
-| `--config` | — | Path to a YAML config file. |
-| `--host` | `server.host` | HTTP listen host. |
-| `--port` | `server.port` | HTTP listen port. |
-| `--base-path` | `server.base_path` | Base path for reverse-proxy sub-paths. |
-| `--db-path` | `database.path` | SQLite database path. |
-| `--log-level` | `log.level` | `debug` \| `info` \| `warn` \| `error`. |
-| `--log-format` | `log.format` | `json` \| `text`. |
-| `--version` | — | Print the version and exit. |
-
-## Environment variables
-
-Every config key is settable via an environment variable using the `BOTHAN_`
-prefix with dots replaced by underscores:
-
-| Variable | Config key |
-|---|---|
-| `BOTHAN_SERVER_PORT` | `server.port` |
-| `BOTHAN_DATABASE_PATH` | `database.path` |
-| `BOTHAN_SSLLABS_API_VERSION` | `ssllabs.api_version` |
-| `BOTHAN_SSLLABS_EMAIL` | `ssllabs.email` |
-| `BOTHAN_CRYPTO_ENCRYPTION_KEY` | `crypto.encryption_key` |
-| `BOTHAN_LOG_LEVEL` | `log.level` |
-
-See `config.yaml.example` for the full set of options.
 
 ## License
 
