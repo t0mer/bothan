@@ -77,6 +77,11 @@ export const api = {
   hostChannels: (id: number) => req<Channel[]>("GET", `/hosts/${id}/channels`),
   setHostChannels: (id: number, ids: number[]) =>
     req<Channel[]>("PUT", `/hosts/${id}/channels`, { ids }),
+  hostRules: (id: number) => req<Rule[]>("GET", `/hosts/${id}/rules`),
+  setHostRules: (
+    id: number,
+    rules: { condition_type: string; threshold_grade?: string; expiry_days?: number }[],
+  ) => req<Rule[]>("PUT", `/hosts/${id}/rules`, { rules }),
 
   listRules: () => req<Rule[]>("GET", "/rules"),
   createRule: (r: unknown) => req<Rule>("POST", "/rules", r),

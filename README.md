@@ -96,6 +96,9 @@ rest from the **Settings** page.
 ### Channels
 ![Channels](assets/screenshots/channels-light.png)
 
+### Host add/edit with per-host notifications
+![Host edit with notification selection](assets/screenshots/host-edit-notify.png)
+
 ### Rules
 ![Rules](assets/screenshots/rules-light.png)
 
@@ -185,6 +188,15 @@ while the failing grade is unchanged and re-fire on change.
 | `GET/POST` | `/api/v1/rules` | List / create rules (global or per-host). |
 | `GET/PUT/DELETE` | `/api/v1/rules/{id}` | Get / update / delete a rule. |
 | `GET` | `/api/v1/hosts/{id}/rules` | Rules attached to a host. |
+| `PUT` | `/api/v1/hosts/{id}/rules` | Replace a host's notification conditions (`{ "rules": [{ "condition_type", "threshold_grade?", "expiry_days?" }] }`). |
+
+Per-host notifications are chosen right on the **host add/edit dialog** — a
+"Notify me when…" section with a checkbox per condition (grade below a chosen
+grade, grade changed/improved/worsened, certificate expiring within N days, scan
+failed, vulnerability detected, or every scan). These become the host's rules;
+global rules (from the Rules page) still apply on top. Channels can be **edited**
+from the Channels page (name, provider, enabled, and optionally new credentials —
+leave blank to keep the current ones).
 
 Channel providers: `shoutrrr` (one URL covering Telegram/Slack/Discord/SMTP/…),
 `whatsapp_greenapi` (GreenAPI cloud), and `whatsapp_multidevice` (self-hosted

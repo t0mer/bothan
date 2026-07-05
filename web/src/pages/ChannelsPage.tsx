@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api";
+import ChannelEditDialog from "../components/ChannelEditDialog";
 import type { Channel } from "../types";
 
 const TYPES = [
@@ -16,6 +17,7 @@ export default function ChannelsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Channel | null>(null);
 
   async function refresh() {
     try {
@@ -104,6 +106,13 @@ export default function ChannelsPage() {
                       </button>
                       <button
                         type="button"
+                        onClick={() => setEditing(c)}
+                        className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => guard(() => api.updateChannel(c.id, { name: c.name, type: c.type, enabled: !c.enabled }))}
                         className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
                       >
@@ -125,6 +134,17 @@ export default function ChannelsPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {editing && (
+        <ChannelEditDialog
+          channel={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setNotice("Channel updated.");
+            refresh();
+          }}
+        />
       )}
     </div>
   );
