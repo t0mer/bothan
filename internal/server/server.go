@@ -14,6 +14,7 @@ import (
 	"github.com/t0mer/bothan/internal/api"
 	"github.com/t0mer/bothan/internal/metrics"
 	"github.com/t0mer/bothan/internal/settings"
+	"github.com/t0mer/bothan/internal/ssllabs"
 	"github.com/t0mer/bothan/internal/store"
 	"github.com/t0mer/bothan/internal/version"
 	"github.com/t0mer/bothan/internal/web"
@@ -24,7 +25,20 @@ type Deps struct {
 	Settings *settings.Service
 	Store    *store.Store
 	Metrics  *metrics.Metrics
+	Scanner  api.Scanner
 	Logger   *slog.Logger
+}
+
+// newSSLLabsFactory builds a client factory for the info/registration
+// endpoints, honouring the bootstrap base-URL override.
+func newSSLLabsFactory(baseURL string) api.SSLLabsClientFactory {
+	return func(s *settings.Settings) api.SSLLabsClient {
+		return ssllabs.New(ssllabs.Options{
+			APIVersion: s.SSLLabs.APIVersion,
+			Email:      s.SSLLabs.Email,
+			BaseURL:    baseURL,
+		})
+	}
 }
 
 // New builds the HTTP handler tree. The returned handler already accounts for
@@ -50,10 +64,15 @@ func New(d Deps) (http.Handler, error) {
 	}
 
 	// API v1.
-	hosts := api.NewHosts(d.Store.Hosts(), func() bool {
-		return d.Settings.Current().SSLLabs.DefaultPublish
-	})
+	hosts := api.NewHosts(
+		d.Store.Hosts(),
+		func() bool { return d.Settings.Current().SSLLabs.DefaultPublish },
+		d.Scanner,
+		d.Store.Scans(),
+	)
 	settingsHandler := api.NewSettings(d.Settings)
+	scansHandler := api.NewScans(d.Store.Scans())
+	ssllabsHandler := api.NewSSLLabs(d.Settings, newSSLLabsFactory(d.Settings.Bootstrap().SSLLabsBaseURL))
 	r.Route("/api/v1", func(v1 chi.Router) {
 		v1.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 			api.WriteError(w, http.StatusNotFound, "not_found", "no such API endpoint")
@@ -63,6 +82,8 @@ func New(d Deps) (http.Handler, error) {
 		})
 		v1.Route("/hosts", hosts.Routes)
 		v1.Route("/settings", settingsHandler.Routes)
+		v1.Route("/scans", scansHandler.Routes)
+		v1.Route("/ssllabs", ssllabsHandler.Routes)
 	})
 
 	// Embedded SPA as the catch-all (mounted last so API/system routes win).

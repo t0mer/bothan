@@ -13,6 +13,7 @@ import (
 
 	"github.com/t0mer/bothan/internal/config"
 	"github.com/t0mer/bothan/internal/metrics"
+	"github.com/t0mer/bothan/internal/scanner"
 	"github.com/t0mer/bothan/internal/settings"
 	"github.com/t0mer/bothan/internal/store"
 )
@@ -30,10 +31,18 @@ func testHandler(t *testing.T) http.Handler {
 		t.Fatalf("settings: %v", err)
 	}
 
+	scanSvc := scanner.New(scanner.Options{
+		Store:    st,
+		Settings: svc,
+		Factory:  scanner.DefaultFactory("", nil),
+		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
+
 	h, err := New(Deps{
 		Settings: svc,
 		Store:    st,
 		Metrics:  metrics.New(),
+		Scanner:  scanSvc,
 		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	if err != nil {

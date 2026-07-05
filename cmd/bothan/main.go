@@ -16,6 +16,7 @@ import (
 
 	"github.com/t0mer/bothan/internal/config"
 	"github.com/t0mer/bothan/internal/metrics"
+	"github.com/t0mer/bothan/internal/scanner"
 	"github.com/t0mer/bothan/internal/server"
 	"github.com/t0mer/bothan/internal/settings"
 	"github.com/t0mer/bothan/internal/store"
@@ -74,10 +75,19 @@ func run(args []string) error {
 
 	m := metrics.New()
 
+	scanSvc := scanner.New(scanner.Options{
+		Store:    st,
+		Settings: settingsSvc,
+		Factory:  scanner.DefaultFactory(bootstrap.SSLLabsBaseURL, nil),
+		Logger:   logger,
+	})
+	recoverPendingScans(ctx, st, scanSvc, logger)
+
 	handler, err := server.New(server.Deps{
 		Settings: settingsSvc,
 		Store:    st,
 		Metrics:  m,
+		Scanner:  scanSvc,
 		Logger:   logger,
 	})
 	if err != nil {
@@ -120,8 +130,28 @@ func run(args []string) error {
 	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("graceful shutdown: %w", err)
 	}
+	logger.Info("waiting for in-flight scans")
+	scanSvc.Wait()
 	logger.Info("bothan stopped")
 	return nil
+}
+
+// recoverPendingScans re-dispatches scans left pending/running by a previous
+// process (best-effort restart recovery).
+func recoverPendingScans(ctx context.Context, st *store.Store, sc *scanner.Service, logger *slog.Logger) {
+	pending, err := st.Scans().PendingScans(ctx)
+	if err != nil {
+		logger.Error("recovering pending scans", slog.String("error", err.Error()))
+		return
+	}
+	for _, scan := range pending {
+		host, err := st.Hosts().Get(ctx, scan.HostID)
+		if err != nil {
+			continue
+		}
+		logger.Info("resuming scan", slog.Int64("scan", scan.ID), slog.String("host", host.Hostname))
+		sc.Resume(*host, scan.ID)
+	}
 }
 
 // newLogger builds a slog logger honoring the configured format, with the level
