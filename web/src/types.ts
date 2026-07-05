@@ -143,6 +143,55 @@ export interface ScanDiff {
   endpoints: EndpointDiff[];
 }
 
+// Raw SSL Labs Host object (the complete stored report). Fields are optional
+// since Bothan preserves the provider payload verbatim.
+export interface RawCert {
+  id: string;
+  subject?: string;
+  issuerSubject?: string;
+  notAfter?: number;
+}
+
+export interface RawProtocol {
+  name: string;
+  version: string;
+}
+
+export interface RawEndpointDetails {
+  protocols?: RawProtocol[];
+  certChains?: { certIds?: string[] }[];
+  heartbleed?: boolean;
+  poodle?: boolean;
+  poodleTls?: number;
+  freak?: boolean;
+  logjam?: boolean;
+  drownVulnerable?: boolean;
+  vulnBeast?: boolean;
+}
+
+export interface RawEndpoint {
+  ipAddress: string;
+  serverName?: string;
+  grade?: string;
+  gradeTrustIgnored?: string;
+  hasWarnings?: boolean;
+  isExceptional?: boolean;
+  statusMessage?: string;
+  progress?: number;
+  details?: RawEndpointDetails;
+}
+
+export interface RawHost {
+  host?: string;
+  port?: number;
+  status?: string;
+  statusMessage?: string;
+  engineVersion?: string;
+  criteriaVersion?: string;
+  endpoints?: RawEndpoint[];
+  certs?: RawCert[];
+}
+
 export interface ScanEndpoint {
   id: number;
   ip_address: string;

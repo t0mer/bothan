@@ -4,11 +4,14 @@ export default function Modal({
   title,
   onClose,
   children,
+  size = "md",
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  size?: "md" | "lg" | "xl";
 }) {
+  const maxW = size === "xl" ? "max-w-3xl" : size === "lg" ? "max-w-xl" : "max-w-md";
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -20,7 +23,7 @@ export default function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+        className={`max-h-[85vh] w-full ${maxW} overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Modal from "./Modal";
+import ScanReportDialog from "./ScanReportDialog";
 import { api } from "../lib/api";
 import { gradeClasses, gradeLabel } from "../lib/grade";
 import type { Host, Scan, ScanDiff } from "../types";
@@ -10,6 +11,7 @@ export default function HostHistoryDialog({ host, onClose }: { host: Host; onClo
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<number[]>([]);
   const [diff, setDiff] = useState<ScanDiff | null>(null);
+  const [reportId, setReportId] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -72,6 +74,16 @@ export default function HostHistoryDialog({ host, onClose }: { host: Host; onClo
                     </td>
                     <td className="px-3 py-1.5 text-xs text-slate-500 dark:text-slate-400">{s.status}</td>
                     <td className="px-3 py-1.5 text-xs text-slate-500 dark:text-slate-400">{s.trigger}</td>
+                    <td className="px-3 py-1.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setReportId(s.id)}
+                        title="Open full report"
+                        className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                      >
+                        Report
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -89,6 +101,9 @@ export default function HostHistoryDialog({ host, onClose }: { host: Host; onClo
           </div>
           {diff && <DiffView diff={diff} />}
         </>
+      )}
+      {reportId !== null && (
+        <ScanReportDialog scanId={reportId} hostname={host.hostname} onClose={() => setReportId(null)} />
       )}
     </Modal>
   );
