@@ -1,15 +1,11 @@
 package config
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/spf13/pflag"
 )
 
-// newFlags builds a flag set with Bothan's flags registered, as main() would.
 func newFlags(t *testing.T) *pflag.FlagSet {
 	t.Helper()
 	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
@@ -22,110 +18,69 @@ func TestLoad_Defaults(t *testing.T) {
 	if err := fs.Parse(nil); err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	cfg, err := Load(fs)
+	b, err := Load(fs)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-
-	if cfg.Server.Host != "0.0.0.0" {
-		t.Errorf("server.host = %q, want 0.0.0.0", cfg.Server.Host)
+	if b.DatabasePath != defaultDatabasePath {
+		t.Errorf("db path = %q, want %q", b.DatabasePath, defaultDatabasePath)
 	}
-	if cfg.Server.Port != 8080 {
-		t.Errorf("server.port = %d, want 8080", cfg.Server.Port)
+	if b.EncryptionKey != "" {
+		t.Errorf("encryption key = %q, want empty", b.EncryptionKey)
 	}
-	if cfg.SSLLabs.APIVersion != "v4" {
-		t.Errorf("ssllabs.api_version = %q, want v4", cfg.SSLLabs.APIVersion)
-	}
-	if cfg.SSLLabs.PollInterval != 10*time.Second {
-		t.Errorf("poll_interval = %s, want 10s", cfg.SSLLabs.PollInterval)
-	}
-	if cfg.SSLLabs.ScanTimeout != 20*time.Minute {
-		t.Errorf("scan_timeout = %s, want 20m", cfg.SSLLabs.ScanTimeout)
-	}
-	if cfg.SSLLabs.MaxWorkers != 5 {
-		t.Errorf("max_workers = %d, want 5", cfg.SSLLabs.MaxWorkers)
-	}
-	if cfg.Log.Level != "info" || cfg.Log.Format != "json" {
-		t.Errorf("log = %+v, want level=info format=json", cfg.Log)
-	}
-	if !cfg.Metrics.Enabled {
-		t.Errorf("metrics.enabled = false, want true")
-	}
-	if cfg.Auth.Enabled {
-		t.Errorf("auth.enabled = true, want false")
+	if b.ServerHostSet || b.ServerPortSet {
+		t.Errorf("server overrides should be unset by default")
 	}
 }
 
-func TestLoad_EnvOverridesYAML(t *testing.T) {
-	dir := t.TempDir()
-	yamlPath := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(yamlPath, []byte("server:\n  port: 9000\nssllabs:\n  email: yaml@example.com\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	t.Setenv("BOTHAN_SERVER_PORT", "9999")
-	t.Setenv("BOTHAN_CRYPTO_ENCRYPTION_KEY", "envkey")
+func TestLoad_EnvBootstrap(t *testing.T) {
+	t.Setenv("BOTHAN_DATABASE_PATH", "/var/data/b.db")
+	t.Setenv("BOTHAN_CRYPTO_ENCRYPTION_KEY", "secretkey")
+	t.Setenv("BOTHAN_SERVER_PORT", "9000")
 
 	fs := newFlags(t)
-	if err := fs.Parse([]string{"--config", yamlPath}); err != nil {
+	if err := fs.Parse(nil); err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	cfg, err := Load(fs)
+	b, err := Load(fs)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-
-	if cfg.Server.Port != 9999 {
-		t.Errorf("server.port = %d, want 9999 (env over yaml)", cfg.Server.Port)
+	if b.DatabasePath != "/var/data/b.db" {
+		t.Errorf("db path = %q", b.DatabasePath)
 	}
-	if cfg.SSLLabs.Email != "yaml@example.com" {
-		t.Errorf("ssllabs.email = %q, want yaml value", cfg.SSLLabs.Email)
+	if b.EncryptionKey != "secretkey" {
+		t.Errorf("key = %q", b.EncryptionKey)
 	}
-	if cfg.Crypto.EncryptionKey != "envkey" {
-		t.Errorf("crypto.encryption_key = %q, want envkey", cfg.Crypto.EncryptionKey)
+	if !b.ServerPortSet || b.ServerPort != 9000 {
+		t.Errorf("port override = %d set=%v, want 9000 set", b.ServerPort, b.ServerPortSet)
 	}
 }
 
 func TestLoad_FlagOverridesEnv(t *testing.T) {
-	t.Setenv("BOTHAN_SERVER_PORT", "9999")
-
+	t.Setenv("BOTHAN_DATABASE_PATH", "/env/path.db")
 	fs := newFlags(t)
-	if err := fs.Parse([]string{"--port", "7070"}); err != nil {
+	if err := fs.Parse([]string{"--db-path", "/flag/path.db", "--port", "7070"}); err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	cfg, err := Load(fs)
+	b, err := Load(fs)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if cfg.Server.Port != 7070 {
-		t.Errorf("server.port = %d, want 7070 (flag over env)", cfg.Server.Port)
+	if b.DatabasePath != "/flag/path.db" {
+		t.Errorf("db path = %q, want flag value", b.DatabasePath)
+	}
+	if !b.ServerPortSet || b.ServerPort != 7070 {
+		t.Errorf("port = %d, want 7070", b.ServerPort)
 	}
 }
 
-func TestLoad_ValidationRejectsBadValues(t *testing.T) {
-	cases := map[string][]string{
-		"bad api version": {"--config", writeYAML(t, "ssllabs:\n  api_version: v5\n")},
-		"bad log level":   {"--config", writeYAML(t, "log:\n  level: verbose\n")},
-		"bad port":        {"--port", "70000"},
+func TestLoad_InvalidPort(t *testing.T) {
+	fs := newFlags(t)
+	if err := fs.Parse([]string{"--port", "70000"}); err != nil {
+		t.Fatalf("parse: %v", err)
 	}
-	for name, args := range cases {
-		t.Run(name, func(t *testing.T) {
-			fs := newFlags(t)
-			if err := fs.Parse(args); err != nil {
-				t.Fatalf("parse: %v", err)
-			}
-			if _, err := Load(fs); err == nil {
-				t.Errorf("expected validation error, got nil")
-			}
-		})
+	if _, err := Load(fs); err == nil {
+		t.Errorf("expected error for out-of-range port")
 	}
-}
-
-func writeYAML(t *testing.T, body string) string {
-	t.Helper()
-	p := filepath.Join(t.TempDir(), "config.yaml")
-	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	return p
 }
