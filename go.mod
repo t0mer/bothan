@@ -1,6 +1,6 @@
 module github.com/t0mer/bothan
 
-go 1.25.11
+go 1.25.0
 
 require (
 	github.com/containrrr/shoutrrr v0.8.0

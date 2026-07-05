@@ -18,6 +18,11 @@ CLAUDE.md
 /dist/
 /bin/
 /build/
+/bothan
+/bothan.exe
+
+# Local run data (database, encryption key, etc.)
+/rundata/
 
 # Go
 *.exe
@@ -52,6 +57,8 @@ internal/web/dist/*
 /data/
 *.db
 *.db-journal
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
 
