@@ -12,7 +12,9 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/t0mer/bothan/internal/api"
+	"github.com/t0mer/bothan/internal/crypto"
 	"github.com/t0mer/bothan/internal/metrics"
+	"github.com/t0mer/bothan/internal/notify"
 	"github.com/t0mer/bothan/internal/settings"
 	"github.com/t0mer/bothan/internal/ssllabs"
 	"github.com/t0mer/bothan/internal/store"
@@ -27,6 +29,7 @@ type Deps struct {
 	Metrics   *metrics.Metrics
 	Scanner   api.Scanner
 	Scheduler api.SchedulerControl
+	Cipher    *crypto.Cipher
 	Logger    *slog.Logger
 }
 
@@ -71,11 +74,16 @@ func New(d Deps) (http.Handler, error) {
 		Scanner:        d.Scanner,
 		Scans:          d.Store.Scans(),
 		Schedules:      d.Store.Schedules(),
+		Channels:       d.Store.Channels(),
+		Rules:          d.Store.Rules(),
 		Scheduler:      d.Scheduler,
 	})
+	dispatcher := notify.NewDispatcher(nil)
 	settingsHandler := api.NewSettings(d.Settings)
 	scansHandler := api.NewScans(d.Store.Scans())
 	schedulesHandler := api.NewSchedules(d.Store.Schedules(), d.Scheduler)
+	channelsHandler := api.NewChannels(d.Store.Channels(), d.Cipher, dispatcher)
+	rulesHandler := api.NewRules(d.Store.Rules())
 	ssllabsHandler := api.NewSSLLabs(d.Settings, newSSLLabsFactory(d.Settings.Bootstrap().SSLLabsBaseURL))
 	r.Route("/api/v1", func(v1 chi.Router) {
 		v1.NotFound(func(w http.ResponseWriter, _ *http.Request) {
@@ -88,6 +96,8 @@ func New(d Deps) (http.Handler, error) {
 		v1.Route("/settings", settingsHandler.Routes)
 		v1.Route("/scans", scansHandler.Routes)
 		v1.Route("/schedules", schedulesHandler.Routes)
+		v1.Route("/channels", channelsHandler.Routes)
+		v1.Route("/rules", rulesHandler.Routes)
 		v1.Route("/ssllabs", ssllabsHandler.Routes)
 	})
 

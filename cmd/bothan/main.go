@@ -15,7 +15,9 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/t0mer/bothan/internal/config"
+	"github.com/t0mer/bothan/internal/crypto"
 	"github.com/t0mer/bothan/internal/metrics"
+	"github.com/t0mer/bothan/internal/notify"
 	"github.com/t0mer/bothan/internal/scanner"
 	"github.com/t0mer/bothan/internal/scheduler"
 	"github.com/t0mer/bothan/internal/server"
@@ -76,12 +78,30 @@ func run(args []string) error {
 
 	m := metrics.New()
 
+	// Optional encryption cipher (required only once channels exist).
+	var cipher *crypto.Cipher
+	if bootstrap.EncryptionKey != "" {
+		cipher, err = crypto.New(bootstrap.EncryptionKey)
+		if err != nil {
+			return fmt.Errorf("initializing encryption: %w", err)
+		}
+	}
+
 	scanSvc := scanner.New(scanner.Options{
 		Store:    st,
 		Settings: settingsSvc,
 		Factory:  scanner.DefaultFactory(bootstrap.SSLLabsBaseURL, nil),
 		Logger:   logger,
 	})
+
+	// Rules engine dispatches notifications after each scan.
+	engine := notify.NewEngine(notify.EngineOptions{
+		Store:  st,
+		Cipher: cipher,
+		Logger: logger,
+	})
+	scanSvc.OnComplete(engine.Evaluate)
+
 	recoverPendingScans(ctx, st, scanSvc, logger)
 
 	schedSvc := scheduler.New(st, scanSvc, logger)
@@ -95,6 +115,7 @@ func run(args []string) error {
 		Metrics:   m,
 		Scanner:   scanSvc,
 		Scheduler: schedSvc,
+		Cipher:    cipher,
 		Logger:    logger,
 	})
 	if err != nil {
