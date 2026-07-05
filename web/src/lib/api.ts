@@ -1,4 +1,4 @@
-import type { Host, HostInput } from "../types";
+import type { Host, HostInput, Settings, SettingsPatch } from "../types";
 
 const BASE = "/api/v1";
 
@@ -36,4 +36,7 @@ export const api = {
   deleteHost: (id: number) => req<void>("DELETE", `/hosts/${id}`),
   enableHost: (id: number) => req<Host>("POST", `/hosts/${id}/enable`),
   disableHost: (id: number) => req<Host>("POST", `/hosts/${id}/disable`),
+
+  getSettings: () => req<Settings>("GET", "/settings"),
+  updateSettings: (patch: SettingsPatch) => req<Settings>("PUT", "/settings", patch),
 };
