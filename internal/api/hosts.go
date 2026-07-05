@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/t0mer/bothan/internal/model"
+	"github.com/t0mer/bothan/internal/scanner"
 	"github.com/t0mer/bothan/internal/store"
 )
 
@@ -24,16 +26,31 @@ type HostRepo interface {
 	Delete(ctx context.Context, id int64) error
 }
 
+// Scanner triggers scans (satisfied by *scanner.Service).
+type Scanner interface {
+	Trigger(ctx context.Context, hostID int64, trigger string) (*model.Scan, error)
+}
+
+// ScanReader reads persisted scans (satisfied by *store.ScanRepo).
+type ScanReader interface {
+	Get(ctx context.Context, id int64) (*model.Scan, error)
+	GetRaw(ctx context.Context, id int64) ([]byte, error)
+	ListByHost(ctx context.Context, hostID int64, limit int) ([]model.Scan, error)
+	LatestByHosts(ctx context.Context) (map[int64]model.HostScanSummary, error)
+}
+
 // Hosts holds the host resource handlers.
 type Hosts struct {
 	repo           HostRepo
 	defaultPublish func() bool
+	scanner        Scanner
+	scans          ScanReader
 }
 
 // NewHosts builds the host handlers. defaultPublish supplies the current
 // default publish flag (read from settings) when a create request omits it.
-func NewHosts(repo HostRepo, defaultPublish func() bool) *Hosts {
-	return &Hosts{repo: repo, defaultPublish: defaultPublish}
+func NewHosts(repo HostRepo, defaultPublish func() bool, sc Scanner, scans ScanReader) *Hosts {
+	return &Hosts{repo: repo, defaultPublish: defaultPublish, scanner: sc, scans: scans}
 }
 
 // Routes mounts the host endpoints onto r.
@@ -46,7 +63,48 @@ func (h *Hosts) Routes(r chi.Router) {
 		r.Delete("/", h.delete)
 		r.Post("/enable", h.enable)
 		r.Post("/disable", h.disable)
+		r.Post("/scan", h.scan)
+		r.Get("/scans", h.scanHistory)
 	})
+}
+
+func (h *Hosts) scan(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	sc, err := h.scanner.Trigger(r.Context(), id, model.TriggerManual)
+	if err != nil {
+		if errors.Is(err, scanner.ErrScanInProgress) {
+			WriteError(w, http.StatusConflict, "scan_in_progress", err.Error())
+			return
+		}
+		if errors.Is(err, scanner.ErrNoEmail) {
+			WriteError(w, http.StatusPreconditionFailed, "ssllabs_unregistered", err.Error())
+			return
+		}
+		writeStoreError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusAccepted, sc)
+}
+
+func (h *Hosts) scanHistory(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	if _, err := h.repo.Get(r.Context(), id); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	limit := queryInt(r, "limit", 50)
+	scans, err := h.scans.ListByHost(r.Context(), id, limit)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", "failed to list scans")
+		return
+	}
+	WriteJSON(w, http.StatusOK, scans)
 }
 
 // hostRequest is the create/update payload. Pointers distinguish "omitted" from
@@ -61,13 +119,37 @@ type hostRequest struct {
 	Notes          string `json:"notes"`
 }
 
+// hostListItem is a host enriched with its latest scan summary for list views.
+type hostListItem struct {
+	model.Host
+	LatestGrade    string     `json:"latest_grade,omitempty"`
+	LastScanStatus string     `json:"last_scan_status,omitempty"`
+	LastScanAt     *time.Time `json:"last_scan_at,omitempty"`
+}
+
 func (h *Hosts) list(w http.ResponseWriter, r *http.Request) {
 	hosts, err := h.repo.List(r.Context())
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal", "failed to list hosts")
 		return
 	}
-	WriteJSON(w, http.StatusOK, hosts)
+
+	var summaries map[int64]model.HostScanSummary
+	if h.scans != nil {
+		summaries, _ = h.scans.LatestByHosts(r.Context())
+	}
+
+	items := make([]hostListItem, 0, len(hosts))
+	for _, host := range hosts {
+		item := hostListItem{Host: host}
+		if s, ok := summaries[host.ID]; ok {
+			item.LatestGrade = s.Grade
+			item.LastScanStatus = s.Status
+			item.LastScanAt = s.CompletedAt
+		}
+		items = append(items, item)
+	}
+	WriteJSON(w, http.StatusOK, items)
 }
 
 func (h *Hosts) create(w http.ResponseWriter, r *http.Request) {
@@ -201,6 +283,15 @@ func validateHost(h *model.Host) string {
 	return ""
 }
 
+func queryInt(r *http.Request, key string, def int) int {
+	if v := r.URL.Query().Get(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return def
+}
+
 func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil || id < 1 {
@@ -213,7 +304,7 @@ func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 func writeStoreError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		WriteError(w, http.StatusNotFound, "not_found", "host not found")
+		WriteError(w, http.StatusNotFound, "not_found", "not found")
 	case errors.Is(err, store.ErrConflict):
 		WriteError(w, http.StatusConflict, "conflict", "a host with that hostname already exists")
 	default:

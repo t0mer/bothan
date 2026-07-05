@@ -24,6 +24,9 @@ type Bootstrap struct {
 	DatabasePath string
 	// EncryptionKey is the AES-256-GCM key (base64/hex). Never stored in the DB.
 	EncryptionKey string
+	// SSLLabsBaseURL overrides the SSL Labs API base URL (self-hosted/testing);
+	// empty uses the default for the configured API version.
+	SSLLabsBaseURL string
 
 	// ServerHost / ServerPort are optional overrides for the HTTP bind. When
 	// set they win over the database value (so a container can pin its bind).
@@ -49,6 +52,9 @@ func Load(fs *pflag.FlagSet) (*Bootstrap, error) {
 
 	b.DatabasePath = resolveString(fs, "db-path", "BOTHAN_DATABASE_PATH", defaultDatabasePath)
 	b.EncryptionKey = resolveString(fs, "encryption-key", "BOTHAN_CRYPTO_ENCRYPTION_KEY", "")
+	if v, ok := resolveOptionalString(fs, "", "BOTHAN_SSLLABS_BASE_URL"); ok {
+		b.SSLLabsBaseURL = v
+	}
 
 	if host, ok := resolveOptionalString(fs, "host", "BOTHAN_SERVER_HOST"); ok {
 		b.ServerHost, b.ServerHostSet = host, true
