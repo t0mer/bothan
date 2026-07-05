@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/t0mer/bothan/internal/api"
+	"github.com/t0mer/bothan/internal/auth"
 	"github.com/t0mer/bothan/internal/crypto"
 	"github.com/t0mer/bothan/internal/metrics"
 	"github.com/t0mer/bothan/internal/notify"
@@ -30,7 +31,23 @@ type Deps struct {
 	Scanner   api.Scanner
 	Scheduler api.SchedulerControl
 	Cipher    *crypto.Cipher
+	Auth      *auth.Service
 	Logger    *slog.Logger
+}
+
+// metricsHandler serves Prometheus metrics, requiring auth only when both auth
+// and protect_metrics are enabled.
+func metricsHandler(m *metrics.Metrics, authSvc *auth.Service) http.Handler {
+	base := m.Handler()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if authSvc.Enabled() && authSvc.ProtectMetrics() {
+			if p := authSvc.Authenticate(r); p == nil {
+				api.WriteError(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+				return
+			}
+		}
+		base.ServeHTTP(w, r)
+	})
 }
 
 // newSSLLabsFactory builds a client factory for the info/registration
@@ -64,7 +81,7 @@ func New(d Deps) (http.Handler, error) {
 	r.Get("/healthz", healthHandler)
 	r.Get("/readyz", readyHandler(d.Store))
 	if cur.Metrics.Enabled {
-		r.Handle("/metrics", d.Metrics.Handler())
+		r.Handle("/metrics", metricsHandler(d.Metrics, d.Auth))
 	}
 
 	// API v1.
@@ -87,6 +104,16 @@ func New(d Deps) (http.Handler, error) {
 	dashboardHandler := api.NewDashboard(d.Store.Dashboard())
 	configHandler := api.NewConfig(d.Store, d.Cipher, version.Version, d.Scheduler)
 	ssllabsHandler := api.NewSSLLabs(d.Settings, newSSLLabsFactory(d.Settings.Bootstrap().SSLLabsBaseURL))
+	authHandler := api.NewAuth(d.Auth, d.Store.Tokens())
+
+	unauthorized := func(w http.ResponseWriter, _ *http.Request, code, msg string) {
+		status := http.StatusUnauthorized
+		if code == "forbidden" {
+			status = http.StatusForbidden
+		}
+		api.WriteError(w, status, code, msg)
+	}
+
 	r.Route("/api/v1", func(v1 chi.Router) {
 		v1.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 			api.WriteError(w, http.StatusNotFound, "not_found", "no such API endpoint")
@@ -94,15 +121,24 @@ func New(d Deps) (http.Handler, error) {
 		v1.MethodNotAllowed(func(w http.ResponseWriter, _ *http.Request) {
 			api.WriteError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 		})
-		v1.Route("/hosts", hosts.Routes)
-		v1.Route("/settings", settingsHandler.Routes)
-		v1.Route("/scans", scansHandler.Routes)
-		v1.Route("/schedules", schedulesHandler.Routes)
-		v1.Route("/channels", channelsHandler.Routes)
-		v1.Route("/rules", rulesHandler.Routes)
-		v1.Route("/dashboard", dashboardHandler.Routes)
-		v1.Route("/config", configHandler.Routes)
-		v1.Route("/ssllabs", ssllabsHandler.Routes)
+
+		// Auth session endpoints are always reachable (login/logout/me).
+		v1.Route("/auth", authHandler.Routes)
+
+		// Everything else is behind the auth middleware (a no-op when auth is off).
+		v1.Group(func(pr chi.Router) {
+			pr.Use(d.Auth.Protect(unauthorized))
+			pr.Route("/hosts", hosts.Routes)
+			pr.Route("/settings", settingsHandler.Routes)
+			pr.Route("/scans", scansHandler.Routes)
+			pr.Route("/schedules", schedulesHandler.Routes)
+			pr.Route("/channels", channelsHandler.Routes)
+			pr.Route("/rules", rulesHandler.Routes)
+			pr.Route("/dashboard", dashboardHandler.Routes)
+			pr.Route("/config", configHandler.Routes)
+			pr.Route("/ssllabs", ssllabsHandler.Routes)
+			pr.Route("/tokens", authHandler.TokenRoutes)
+		})
 	})
 
 	// Embedded SPA as the catch-all (mounted last so API/system routes win).

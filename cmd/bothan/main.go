@@ -14,6 +14,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/t0mer/bothan/internal/auth"
 	"github.com/t0mer/bothan/internal/config"
 	"github.com/t0mer/bothan/internal/crypto"
 	"github.com/t0mer/bothan/internal/metrics"
@@ -109,6 +110,14 @@ func run(args []string) error {
 		return fmt.Errorf("building schedule registry: %w", err)
 	}
 
+	authSvc := auth.NewService(st, settingsSvc.Current().Auth.SessionSecret, 24*time.Hour,
+		func() bool { return settingsSvc.Current().Auth.Enabled },
+		func() bool { return settingsSvc.Current().Auth.ProtectMetrics },
+	)
+	if err := seedAdmin(ctx, st, *bootstrap, logger); err != nil {
+		return fmt.Errorf("seeding admin user: %w", err)
+	}
+
 	handler, err := server.New(server.Deps{
 		Settings:  settingsSvc,
 		Store:     st,
@@ -116,6 +125,7 @@ func run(args []string) error {
 		Scanner:   scanSvc,
 		Scheduler: schedSvc,
 		Cipher:    cipher,
+		Auth:      authSvc,
 		Logger:    logger,
 	})
 	if err != nil {
@@ -162,6 +172,30 @@ func run(args []string) error {
 	logger.Info("waiting for in-flight scans")
 	scanSvc.Wait()
 	logger.Info("bothan stopped")
+	return nil
+}
+
+// seedAdmin creates the initial admin user from env on first boot when none
+// exists and credentials are provided.
+func seedAdmin(ctx context.Context, st *store.Store, bootstrap config.Bootstrap, logger *slog.Logger) error {
+	if bootstrap.InitialAdminUser == "" || bootstrap.InitialAdminPassword == "" {
+		return nil
+	}
+	count, err := st.Users().Count(ctx)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	hash, err := auth.HashPassword(bootstrap.InitialAdminPassword)
+	if err != nil {
+		return err
+	}
+	if _, err := st.Users().Create(ctx, bootstrap.InitialAdminUser, hash); err != nil {
+		return err
+	}
+	logger.Info("seeded initial admin user", slog.String("username", bootstrap.InitialAdminUser))
 	return nil
 }
 

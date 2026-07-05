@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/t0mer/bothan/internal/auth"
 	"github.com/t0mer/bothan/internal/config"
 	"github.com/t0mer/bothan/internal/metrics"
 	"github.com/t0mer/bothan/internal/scanner"
@@ -38,11 +39,17 @@ func testHandler(t *testing.T) http.Handler {
 		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 
+	authSvc := auth.NewService(st, "test-secret", 0,
+		func() bool { return svc.Current().Auth.Enabled },
+		func() bool { return svc.Current().Auth.ProtectMetrics },
+	)
+
 	h, err := New(Deps{
 		Settings: svc,
 		Store:    st,
 		Metrics:  metrics.New(),
 		Scanner:  scanSvc,
+		Auth:     authSvc,
 		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	if err != nil {
