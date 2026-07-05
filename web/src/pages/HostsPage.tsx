@@ -3,6 +3,7 @@ import { api, ApiError } from "../lib/api";
 import { gradeClasses, gradeLabel } from "../lib/grade";
 import HostSchedulesDialog from "../components/HostSchedulesDialog";
 import HostChannelsDialog from "../components/HostChannelsDialog";
+import HostHistoryDialog from "../components/HostHistoryDialog";
 import type { Host } from "../types";
 
 export default function HostsPage() {
@@ -12,6 +13,7 @@ export default function HostsPage() {
   const [scanning, setScanning] = useState<Set<number>>(new Set());
   const [linkHost, setLinkHost] = useState<Host | null>(null);
   const [channelHost, setChannelHost] = useState<Host | null>(null);
+  const [historyHost, setHistoryHost] = useState<Host | null>(null);
 
   async function refresh() {
     try {
@@ -78,6 +80,7 @@ export default function HostsPage() {
           onScan={scan}
           onSchedules={setLinkHost}
           onChannels={setChannelHost}
+          onHistory={setHistoryHost}
           onChanged={refresh}
           onError={setError}
         />
@@ -85,6 +88,7 @@ export default function HostsPage() {
 
       {linkHost && <HostSchedulesDialog host={linkHost} onClose={() => setLinkHost(null)} />}
       {channelHost && <HostChannelsDialog host={channelHost} onClose={() => setChannelHost(null)} />}
+      {historyHost && <HostHistoryDialog host={historyHost} onClose={() => setHistoryHost(null)} />}
     </div>
   );
 }
@@ -162,6 +166,7 @@ function HostsTable({
   onScan,
   onSchedules,
   onChannels,
+  onHistory,
   onChanged,
   onError,
 }: {
@@ -170,6 +175,7 @@ function HostsTable({
   onScan: (id: number) => void;
   onSchedules: (h: Host) => void;
   onChannels: (h: Host) => void;
+  onHistory: (h: Host) => void;
   onChanged: () => void;
   onError: (msg: string) => void;
 }) {
@@ -200,7 +206,16 @@ function HostsTable({
             const isScanning = scanning.has(h.id) || h.last_scan_status === "running" || h.last_scan_status === "pending";
             return (
               <tr key={h.id} className="bg-white dark:bg-slate-900">
-                <td className="px-4 py-2 font-medium">{h.hostname}</td>
+                <td className="px-4 py-2 font-medium">
+                  <button
+                    type="button"
+                    onClick={() => onHistory(h)}
+                    className="text-slate-900 underline decoration-dotted underline-offset-4 hover:decoration-solid dark:text-slate-100"
+                    title="View scan history and compare"
+                  >
+                    {h.hostname}
+                  </button>
+                </td>
                 <td className="px-4 py-2">
                   <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${gradeClasses(h.latest_grade)}`}>
                     {gradeLabel(h.latest_grade)}

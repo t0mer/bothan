@@ -1,4 +1,14 @@
-import type { Channel, Host, HostInput, Rule, Scan, Schedule, Settings, SettingsPatch } from "../types";
+import type {
+  Channel,
+  Host,
+  HostInput,
+  Rule,
+  Scan,
+  ScanDiff,
+  Schedule,
+  Settings,
+  SettingsPatch,
+} from "../types";
 
 const BASE = "/api/v1";
 
@@ -40,6 +50,7 @@ export const api = {
   scanHost: (id: number) => req<Scan>("POST", `/hosts/${id}/scan`),
   hostScans: (id: number) => req<Scan[]>("GET", `/hosts/${id}/scans`),
   getScan: (id: number) => req<Scan>("GET", `/scans/${id}`),
+  compareScans: (from: number, to: number) => req<ScanDiff>("GET", `/scans/compare?from=${from}&to=${to}`),
 
   listSchedules: () => req<Schedule[]>("GET", "/schedules"),
   createSchedule: (s: { name: string; spec: string; enabled?: boolean }) =>

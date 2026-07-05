@@ -5,13 +5,13 @@ posture of your domains and websites using the [Qualys SSL Labs
 API](https://www.ssllabs.com/), tracks grade history, compares scans over time,
 and alerts you through multiple notification channels when something changes.
 
-> Status: early development. **Phases 1–5** are implemented — the single binary
+> Status: early development. **Phases 1–6** are implemented — the single binary
 > boots, manages monitored **hosts**, runs **SSL Labs assessments**,
-> **schedules** automatic scans via cron, and sends **notifications** (Shoutrrr,
-> GreenAPI, WhatsApp) driven by a rules engine, with channel credentials
-> encrypted at rest. It applies its database schema, exposes Prometheus metrics,
-> and embeds the React web UI. Comparison, dashboard, export/import, and auth
-> arrive in subsequent phases.
+> **schedules** automatic scans via cron, sends **notifications** (Shoutrrr,
+> GreenAPI, WhatsApp) driven by a rules engine (credentials encrypted at rest),
+> and **compares** scans over time. It applies its database schema, exposes
+> Prometheus metrics, and embeds the React web UI. Dashboard, export/import, and
+> auth arrive in subsequent phases.
 
 ## What works today
 
@@ -103,6 +103,15 @@ schedules never enqueue, and a host with a scan already in progress is skipped.
 |---|---|---|
 | `GET` | `/api/v1/scans/{id}` | Scan detail with per-endpoint grades and cert expiry. |
 | `GET` | `/api/v1/scans/{id}/raw` | Full raw SSL Labs Host JSON for the scan. |
+| `GET` | `/api/v1/scans/compare?from=&to=` | Structured diff of two scans of the same host. |
+
+Comparison matches endpoints by IP and reports overall/per-endpoint grade
+changes, certificate changes (subject/issuer/expiry), and added/removed
+protocols and vulnerability flags. In the UI, click a hostname to open its scan
+history and pick two scans to compare.
+
+### Scan history
+![Scan history and compare](assets/screenshots/compare-light.png)
 
 ## Notifications
 

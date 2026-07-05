@@ -60,6 +60,34 @@ export interface Scan {
   endpoints?: ScanEndpoint[];
 }
 
+export interface ScanRef {
+  id: number;
+  grade: string;
+  status: string;
+  created_at: string;
+}
+
+export interface EndpointDiff {
+  ip_address: string;
+  change: string;
+  from_grade?: string;
+  to_grade?: string;
+  grade_changed: boolean;
+  cert_changed: boolean;
+  protocols_added?: string[];
+  protocols_removed?: string[];
+  vulns_added?: string[];
+  vulns_removed?: string[];
+}
+
+export interface ScanDiff {
+  host_id: number;
+  from: ScanRef;
+  to: ScanRef;
+  overall_grade_changed: boolean;
+  endpoints: EndpointDiff[];
+}
+
 export interface ScanEndpoint {
   id: number;
   ip_address: string;
