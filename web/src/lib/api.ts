@@ -1,4 +1,6 @@
 import type {
+  ApiToken,
+  AuthMe,
   Channel,
   DashboardSummary,
   Host,
@@ -93,6 +95,15 @@ export const api = {
     if (opts.passphrase) q.set("passphrase", opts.passphrase);
     return req<ImportResult>("POST", `/config/import?${q.toString()}`, bundleData);
   },
+
+  me: () => req<AuthMe>("GET", "/auth/me"),
+  login: (username: string, password: string) =>
+    req<{ username: string }>("POST", "/auth/login", { username, password }),
+  logout: () => req<void>("POST", "/auth/logout"),
+  listTokens: () => req<ApiToken[]>("GET", "/tokens"),
+  createToken: (body: { name: string; scopes: string; expires_in?: string }) =>
+    req<{ token: ApiToken; plaintext: string }>("POST", "/tokens", body),
+  deleteToken: (id: number) => req<void>("DELETE", `/tokens/${id}`),
 
   getSettings: () => req<Settings>("GET", "/settings"),
   updateSettings: (patch: SettingsPatch) => req<Settings>("PUT", "/settings", patch),

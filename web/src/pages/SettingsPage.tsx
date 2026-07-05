@@ -57,6 +57,7 @@ export default function SettingsPage() {
       <SSLLabsSection settings={settings} onSave={save} saving={saving} />
       <LoggingSection settings={settings} onSave={save} saving={saving} />
       <MetricsSection settings={settings} onSave={save} saving={saving} />
+      <AuthSection settings={settings} onSave={save} saving={saving} />
       <ServerSection settings={settings} onSave={save} saving={saving} />
       <BootstrapSection settings={settings} />
       <BackupSection />
@@ -233,6 +234,33 @@ function ServerSection({ settings, onSave, saving }: SectionProps) {
             <input className={inputCls} value={f.base_path} onChange={(e) => setF({ ...f, base_path: e.target.value })} />
           </Field>
         </div>
+        <SaveButton saving={saving} />
+      </Card>
+    </form>
+  );
+}
+
+function AuthSection({ settings, onSave, saving }: SectionProps) {
+  const [f, setF] = useState(settings.auth);
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave({ auth: f });
+      }}
+    >
+      <Card title="Authentication" description="Restart recommended after enabling. A session secret is generated automatically.">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={f.enabled} onChange={(e) => setF({ ...f, enabled: e.target.checked })} />
+          Require login and API tokens
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={f.protect_metrics} onChange={(e) => setF({ ...f, protect_metrics: e.target.checked })} />
+          Also protect the /metrics endpoint
+        </label>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Seed the first admin with BOTHAN_AUTH_INITIAL_ADMIN_USER / _PASSWORD before enabling.
+        </p>
         <SaveButton saving={saving} />
       </Card>
     </form>

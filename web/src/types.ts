@@ -62,6 +62,22 @@ export interface ImportResult {
   report: ImportReport;
 }
 
+export interface AuthMe {
+  auth_enabled: boolean;
+  kind?: string;
+  username?: string;
+  scopes?: string;
+}
+
+export interface ApiToken {
+  id: number;
+  name: string;
+  scopes: string;
+  last_used_at?: string;
+  expires_at?: string;
+  created_at: string;
+}
+
 export interface Channel {
   id: number;
   name: string;
@@ -167,6 +183,7 @@ export interface Settings {
     default_publish: boolean;
   };
   metrics: { enabled: boolean; restart_required: boolean };
+  auth: { enabled: boolean; protect_metrics: boolean; restart_required: boolean };
   bootstrap: { database_path: string; encryption_key_set: boolean };
 }
 
@@ -182,4 +199,5 @@ export interface SettingsPatch {
     default_publish: boolean;
   }>;
   metrics?: Partial<{ enabled: boolean }>;
+  auth?: Partial<{ enabled: boolean; protect_metrics: boolean }>;
 }

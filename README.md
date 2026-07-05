@@ -5,13 +5,14 @@ posture of your domains and websites using the [Qualys SSL Labs
 API](https://www.ssllabs.com/), tracks grade history, compares scans over time,
 and alerts you through multiple notification channels when something changes.
 
-> Status: early development. **Phases 1–8** are implemented — the single binary
+> Status: early development. **Phases 1–9** are implemented — the single binary
 > boots, shows a **dashboard**, manages monitored **hosts**, runs **SSL Labs
 > assessments**, **schedules** automatic scans via cron, sends **notifications**
 > (Shoutrrr, GreenAPI, WhatsApp) driven by a rules engine (credentials encrypted
-> at rest), **compares** scans over time, and supports **config export/import**
-> for backup and migration. It applies its database schema, exposes Prometheus
-> metrics, and embeds the React web UI. Optional auth arrives next.
+> at rest), **compares** scans over time, supports **config export/import**, and
+> offers **optional authentication** (login + scoped API tokens). It applies its
+> database schema, exposes Prometheus metrics, and embeds the React web UI.
+> Metrics polish and release packaging remain.
 
 ## What works today
 
@@ -176,6 +177,34 @@ Import is transactional and all-or-nothing. `merge` upserts by natural key;
 `replace` wipes schedules, channels, and rules first (hosts are upserted so
 **scan history is preserved**). `dry_run=true` validates and reports what would
 change without applying. Manage all of this from **Settings → Backup / Migrate**.
+
+## Authentication (optional)
+
+Authentication is **off by default** (the app is fully open). Enable it under
+**Settings → Authentication**. When enabled:
+
+- **UI** login with an argon2id-hashed password → a signed, HTTP-only session
+  cookie. Seed the first admin on first boot with
+  `BOTHAN_AUTH_INITIAL_ADMIN_USER` / `BOTHAN_AUTH_INITIAL_ADMIN_PASSWORD`.
+- **API** access via bearer tokens (`Authorization: Bearer <token>`). Only the
+  SHA-256 hash is stored; the plaintext is shown once at creation. Tokens carry
+  scopes (`read` < `write` < `admin`) and an optional expiry.
+- `/healthz` and `/readyz` stay open; `/metrics` stays open unless
+  **protect metrics** is also enabled.
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/v1/auth/login` | Log in (`{username, password}`) → session cookie. |
+| `POST` | `/api/v1/auth/logout` | Clear the session. |
+| `GET` | `/api/v1/auth/me` | Current auth status / principal. |
+| `GET/POST` | `/api/v1/tokens` | List / create API tokens (admin). |
+| `DELETE` | `/api/v1/tokens/{id}` | Revoke a token (admin). |
+
+Required scope per request: reads need `read`, mutations need `write`, and token
+and config administration need `admin`. Session logins have full access.
+
+### Login
+![Login](assets/screenshots/login-light.png)
 
 ## SSL Labs API
 
