@@ -1,4 +1,4 @@
-import type { Host, HostInput, Scan, Schedule, Settings, SettingsPatch } from "../types";
+import type { Channel, Host, HostInput, Rule, Scan, Schedule, Settings, SettingsPatch } from "../types";
 
 const BASE = "/api/v1";
 
@@ -50,6 +50,21 @@ export const api = {
   hostSchedules: (id: number) => req<Schedule[]>("GET", `/hosts/${id}/schedules`),
   setHostSchedules: (id: number, ids: number[]) =>
     req<Schedule[]>("PUT", `/hosts/${id}/schedules`, { ids }),
+
+  listChannels: () => req<Channel[]>("GET", "/channels"),
+  createChannel: (c: unknown) => req<Channel>("POST", "/channels", c),
+  updateChannel: (id: number, c: unknown) => req<Channel>("PUT", `/channels/${id}`, c),
+  deleteChannel: (id: number) => req<void>("DELETE", `/channels/${id}`),
+  testChannel: (id: number) => req<{ sent: boolean }>("POST", `/channels/${id}/test`),
+  testChannelConfig: (c: unknown) => req<{ sent: boolean }>("POST", "/channels/test", c),
+  hostChannels: (id: number) => req<Channel[]>("GET", `/hosts/${id}/channels`),
+  setHostChannels: (id: number, ids: number[]) =>
+    req<Channel[]>("PUT", `/hosts/${id}/channels`, { ids }),
+
+  listRules: () => req<Rule[]>("GET", "/rules"),
+  createRule: (r: unknown) => req<Rule>("POST", "/rules", r),
+  updateRule: (id: number, r: unknown) => req<Rule>("PUT", `/rules/${id}`, r),
+  deleteRule: (id: number) => req<void>("DELETE", `/rules/${id}`),
 
   getSettings: () => req<Settings>("GET", "/settings"),
   updateSettings: (patch: SettingsPatch) => req<Settings>("PUT", "/settings", patch),

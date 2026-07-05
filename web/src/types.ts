@@ -23,6 +23,28 @@ export interface Schedule {
   updated_at: string;
 }
 
+export interface Channel {
+  id: number;
+  name: string;
+  type: string;
+  needs_credentials: boolean;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Rule {
+  id: number;
+  host_id?: number | null;
+  name: string;
+  condition_type: string;
+  threshold_grade?: string;
+  expiry_days?: number;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Scan {
   id: number;
   host_id: number;

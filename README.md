@@ -5,12 +5,13 @@ posture of your domains and websites using the [Qualys SSL Labs
 API](https://www.ssllabs.com/), tracks grade history, compares scans over time,
 and alerts you through multiple notification channels when something changes.
 
-> Status: early development. **Phases 1–4** are implemented — the single binary
-> boots, manages monitored **hosts** (CRUD via API and UI), runs **SSL Labs
-> assessments** (manual "scan now", grade history, per-endpoint results),
->**schedules** automatic scans via cron, applies its database schema, exposes
-> Prometheus metrics, and embeds the React web UI. Notifications, comparison,
-> dashboard, export/import, and auth arrive in subsequent phases.
+> Status: early development. **Phases 1–5** are implemented — the single binary
+> boots, manages monitored **hosts**, runs **SSL Labs assessments**,
+> **schedules** automatic scans via cron, and sends **notifications** (Shoutrrr,
+> GreenAPI, WhatsApp) driven by a rules engine, with channel credentials
+> encrypted at rest. It applies its database schema, exposes Prometheus metrics,
+> and embeds the React web UI. Comparison, dashboard, export/import, and auth
+> arrive in subsequent phases.
 
 ## What works today
 
@@ -58,6 +59,12 @@ rest from the **Settings** page.
 ### Schedules
 ![Schedules](assets/screenshots/schedules-light.png)
 
+### Channels
+![Channels](assets/screenshots/channels-light.png)
+
+### Rules
+![Rules](assets/screenshots/rules-light.png)
+
 ## Host API
 
 | Method | Path | Description |
@@ -96,6 +103,32 @@ schedules never enqueue, and a host with a scan already in progress is skipped.
 |---|---|---|
 | `GET` | `/api/v1/scans/{id}` | Scan detail with per-endpoint grades and cert expiry. |
 | `GET` | `/api/v1/scans/{id}/raw` | Full raw SSL Labs Host JSON for the scan. |
+
+## Notifications
+
+Channels are notification destinations; their provider config is **AES-256-GCM
+encrypted at rest** with the instance key and never returned by the API. A rules
+engine runs after each scan and, for every matched rule, sends a message to the
+host's enabled channels. Conditions: `grade_below`, `grade_changed`,
+`grade_downgraded`, `grade_improved`, `cert_expiry`, `scan_failed`,
+`vuln_detected`, `scan_completed`. Repeat `grade_below` alerts are suppressed
+while the failing grade is unchanged and re-fire on change.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET/POST` | `/api/v1/channels` | List / create channels. |
+| `GET/PUT/DELETE` | `/api/v1/channels/{id}` | Get / update / delete a channel. |
+| `POST` | `/api/v1/channels/{id}/test` | Send a test message using stored config. |
+| `POST` | `/api/v1/channels/test` | Send a test using config in the body (pre-save). |
+| `GET/PUT` | `/api/v1/hosts/{id}/channels` | Get / set a host's linked channels. |
+| `GET/POST` | `/api/v1/rules` | List / create rules (global or per-host). |
+| `GET/PUT/DELETE` | `/api/v1/rules/{id}` | Get / update / delete a rule. |
+| `GET` | `/api/v1/hosts/{id}/rules` | Rules attached to a host. |
+
+Channel providers: `shoutrrr` (one URL covering Telegram/Slack/Discord/SMTP/…),
+`whatsapp_greenapi` (GreenAPI cloud), and `whatsapp_multidevice` (self-hosted
+go-whatsapp-web-multidevice). The encryption key is required once any channel
+exists — set `BOTHAN_CRYPTO_ENCRYPTION_KEY` and keep it stable.
 
 ## SSL Labs API
 
