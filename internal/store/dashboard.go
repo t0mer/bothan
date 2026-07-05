@@ -126,6 +126,45 @@ func (r *DashboardRepo) certExpiries(ctx context.Context, sum *model.DashboardSu
 	return rows.Err()
 }
 
+// HostMetrics returns a per-host snapshot (grade + earliest cert expiry) for
+// the Prometheus collector.
+func (r *DashboardRepo) HostMetrics(ctx context.Context) ([]model.HostMetric, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT h.hostname, h.enabled, COALESCE(ls.overall_grade, '') AS grade, mc.earliest
+		FROM hosts h
+		LEFT JOIN (`+latestReadyCTE+`) ls ON ls.host_id = h.id
+		LEFT JOIN (
+			SELECT scan_id, MIN(cert_not_after) AS earliest
+			FROM scan_endpoints WHERE cert_not_after IS NOT NULL GROUP BY scan_id
+		) mc ON mc.scan_id = ls.id
+		ORDER BY h.hostname`)
+	if err != nil {
+		return nil, fmt.Errorf("host metrics: %w", err)
+	}
+	defer rows.Close()
+
+	out := []model.HostMetric{}
+	for rows.Next() {
+		var (
+			hm       model.HostMetric
+			enabled  int
+			earliest sql.NullString
+		)
+		if err := rows.Scan(&hm.Hostname, &enabled, &hm.Grade, &earliest); err != nil {
+			return nil, err
+		}
+		hm.Enabled = enabled != 0
+		if earliest.Valid && earliest.String != "" {
+			t := parseTime(earliest.String)
+			if !t.IsZero() {
+				hm.CertNotAfter = &t
+			}
+		}
+		out = append(out, hm)
+	}
+	return out, rows.Err()
+}
+
 func (r *DashboardRepo) recentScans(ctx context.Context, sum *model.DashboardSummary, limit int) error {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT s.id, s.host_id, h.hostname, COALESCE(s.overall_grade, ''), s.status,

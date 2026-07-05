@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/t0mer/bothan/internal/metrics"
 	"github.com/t0mer/bothan/internal/model"
 	"github.com/t0mer/bothan/internal/settings"
 	"github.com/t0mer/bothan/internal/ssllabs"
@@ -84,8 +85,9 @@ type Service struct {
 	logger   *slog.Logger
 	backoff  Backoff
 
-	sem chan struct{}
-	wg  sync.WaitGroup
+	sem     chan struct{}
+	wg      sync.WaitGroup
+	metrics *metrics.Metrics
 
 	mu         sync.Mutex
 	rng        *rand.Rand
@@ -99,7 +101,8 @@ type Options struct {
 	Factory  Factory
 	Logger   *slog.Logger
 	Backoff  *Backoff
-	MaxSlots int // hard cap on concurrent executions (default 16)
+	MaxSlots int              // hard cap on concurrent executions (default 16)
+	Metrics  *metrics.Metrics // optional; instruments scans
 }
 
 // New builds a scanner Service.
@@ -124,6 +127,7 @@ func New(opts Options) *Service {
 		logger:   logger,
 		backoff:  bo,
 		sem:      make(chan struct{}, slots),
+		metrics:  opts.Metrics,
 		rng:      rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
@@ -167,9 +171,15 @@ func (s *Service) Resume(host model.Host, scanID int64) { s.dispatch(host, scanI
 func (s *Service) Wait() { s.wg.Wait() }
 
 func (s *Service) dispatch(host model.Host, scanID int64) {
+	if s.metrics != nil {
+		s.metrics.ScanQueueDepth.Inc()
+	}
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
+		if s.metrics != nil {
+			defer s.metrics.ScanQueueDepth.Dec()
+		}
 		s.sem <- struct{}{}
 		defer func() { <-s.sem }()
 		s.execute(host, scanID)
@@ -177,6 +187,15 @@ func (s *Service) dispatch(host model.Host, scanID int64) {
 }
 
 func (s *Service) execute(host model.Host, scanID int64) {
+	start := time.Now()
+	status := model.ScanStatusError
+	defer func() {
+		if s.metrics != nil {
+			s.metrics.ScansTotal.WithLabelValues(status).Inc()
+			s.metrics.ScanDuration.Observe(time.Since(start).Seconds())
+		}
+	}()
+
 	cfg := s.settings.Current()
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.SSLLabs.ScanTimeout)
 	defer cancel()
@@ -196,6 +215,7 @@ func (s *Service) execute(host model.Host, scanID int64) {
 		return
 	}
 	s.persist(ctx, scanID, host2, raw)
+	status = model.ScanStatusReady
 }
 
 // assess runs the start + poll loop until READY/ERROR, timeout, or a fatal error.
@@ -255,6 +275,10 @@ func (s *Service) awaitCapacity(ctx context.Context, a Analyzer) error {
 				return ctx.Err()
 			}
 			continue
+		}
+		if s.metrics != nil {
+			s.metrics.SSLLabsCapacity.WithLabelValues("max").Set(float64(info.MaxAssessments))
+			s.metrics.SSLLabsCapacity.WithLabelValues("current").Set(float64(info.CurrentAssessments))
 		}
 		if info.CurrentAssessments < info.MaxAssessments || info.MaxAssessments == 0 {
 			// Honour cool-off between starting new assessments.

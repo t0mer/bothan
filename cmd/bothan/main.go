@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -78,6 +79,7 @@ func run(args []string) error {
 	})
 
 	m := metrics.New()
+	m.RegisterCollector(metrics.NewStoreCollector(st.Dashboard()))
 
 	// Optional encryption cipher (required only once channels exist).
 	var cipher *crypto.Cipher
@@ -88,11 +90,15 @@ func run(args []string) error {
 		}
 	}
 
+	observeSSLLabs := func(code int) {
+		m.SSLLabsRequests.WithLabelValues(strconv.Itoa(code)).Inc()
+	}
 	scanSvc := scanner.New(scanner.Options{
 		Store:    st,
 		Settings: settingsSvc,
-		Factory:  scanner.DefaultFactory(bootstrap.SSLLabsBaseURL, nil),
+		Factory:  scanner.DefaultFactory(bootstrap.SSLLabsBaseURL, observeSSLLabs),
 		Logger:   logger,
+		Metrics:  m,
 	})
 
 	// Rules engine dispatches notifications after each scan.
@@ -100,6 +106,9 @@ func run(args []string) error {
 		Store:  st,
 		Cipher: cipher,
 		Logger: logger,
+		Observe: func(channelType, result string) {
+			m.Notifications.WithLabelValues(channelType, result).Inc()
+		},
 	})
 	scanSvc.OnComplete(engine.Evaluate)
 

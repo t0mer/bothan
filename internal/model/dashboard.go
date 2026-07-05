@@ -43,3 +43,11 @@ type RecentScan struct {
 
 // GradeDisplayOrder is the canonical order for showing grade buckets.
 var GradeDisplayOrder = []string{"A+", "A", "A-", "B", "C", "D", "E", "F", "T", "M", "none"}
+
+// HostMetric is a per-host snapshot for Prometheus gauges.
+type HostMetric struct {
+	Hostname     string
+	Enabled      bool
+	Grade        string     // "" when never scanned
+	CertNotAfter *time.Time // earliest cert expiry, nil when unknown
+}
