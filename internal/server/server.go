@@ -43,7 +43,8 @@ func New(d Deps) (http.Handler, error) {
 		r.Handle("/metrics", d.Metrics.Handler())
 	}
 
-	// API v1 — empty shell for Phase 1; resources land in later phases.
+	// API v1.
+	hosts := api.NewHosts(d.Store.Hosts(), d.Config.SSLLabs.DefaultPublish)
 	r.Route("/api/v1", func(v1 chi.Router) {
 		v1.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 			api.WriteError(w, http.StatusNotFound, "not_found", "no such API endpoint")
@@ -51,6 +52,7 @@ func New(d Deps) (http.Handler, error) {
 		v1.MethodNotAllowed(func(w http.ResponseWriter, _ *http.Request) {
 			api.WriteError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 		})
+		v1.Route("/hosts", hosts.Routes)
 	})
 
 	// Embedded SPA as the catch-all (mounted last so API/system routes win).
