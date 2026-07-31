@@ -82,22 +82,22 @@ rest from the **Settings** page.
 ## Screenshots
 
 ### Dashboard
-![Dashboard](assets/screenshots/dashboard-light.png)
+![Dashboard](https://raw.githubusercontent.com/t0mer/bothan/main/assets/screenshots/dashboard-light.png)
 
 ### Hosts (light)
-![Hosts — light](assets/screenshots/hosts-light.png)
+![Hosts — light](https://raw.githubusercontent.com/t0mer/bothan/main/assets/screenshots/hosts-light.png)
 
 ### Hosts (dark)
-![Hosts — dark](assets/screenshots/hosts-dark.png)
+![Hosts — dark](https://raw.githubusercontent.com/t0mer/bothan/main/assets/screenshots/hosts-dark.png)
 
 ### Schedules
-![Schedules](assets/screenshots/schedules-light.png)
+![Schedules](https://raw.githubusercontent.com/t0mer/bothan/main/assets/screenshots/schedules-light.png)
 
 ### Channels
-![Channels](assets/screenshots/channels-light.png)
+![Channels](https://raw.githubusercontent.com/t0mer/bothan/main/assets/screenshots/channels-light.png)
 
 ### Rules
-![Rules](assets/screenshots/rules-light.png)
+![Rules](https://raw.githubusercontent.com/t0mer/bothan/main/assets/screenshots/rules-light.png)
 
 ## Dashboard API
 
@@ -160,10 +160,10 @@ protocols and vulnerability flags — pick two scans in the history dialog to
 compare.
 
 ### Full scan report
-![Full scan report](assets/screenshots/scan-report-light.png)
+![Full scan report](https://raw.githubusercontent.com/t0mer/bothan/main/assets/screenshots/scan-report-light.png)
 
 ### Scan history
-![Scan history and compare](assets/screenshots/compare-light.png)
+![Scan history and compare](https://raw.githubusercontent.com/t0mer/bothan/main/assets/screenshots/compare-light.png)
 
 ## Notifications
 
@@ -244,7 +244,7 @@ Required scope per request: reads need `read`, mutations need `write`, and token
 and config administration need `admin`. Session logins have full access.
 
 ### Login
-![Login](assets/screenshots/login-light.png)
+![Login](https://raw.githubusercontent.com/t0mer/bothan/main/assets/screenshots/login-light.png)
 
 ## SSL Labs API
 
@@ -270,7 +270,7 @@ SSL Labs settings and the log level apply immediately; server bind, log format,
 and metrics enablement take effect on restart.
 
 ### Settings page
-![Settings](assets/screenshots/settings-light.png)
+![Settings](https://raw.githubusercontent.com/t0mer/bothan/main/assets/screenshots/settings-light.png)
 
 ### Settings API
 
